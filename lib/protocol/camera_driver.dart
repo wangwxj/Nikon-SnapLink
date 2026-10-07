@@ -1,0 +1,140 @@
+import 'dart:typed_data';
+
+/// 相机连接状态枚举
+enum CameraConnectionState {
+  disconnected,
+  connecting,
+  connected,
+  error,
+}
+
+/// 相机文件描述项
+class CameraFileItem {
+  final int handle;
+  final int storageId;
+  final int format;
+  final int size;
+  final String fileName;
+  final String captureDate;
+
+  CameraFileItem({
+    required this.handle,
+    required this.storageId,
+    required this.format,
+    required this.size,
+    required this.fileName,
+    required this.captureDate,
+  });
+
+  bool get isFolder => format == 0x3001;
+
+  bool get isRaw => fileName.toUpperCase().endsWith('.NEF') ||
+                    fileName.toUpperCase().endsWith('.NRW') ||
+                    format == 0xB101;
+
+  bool get isVideo => fileName.toUpperCase().endsWith('.MP4') ||
+                      fileName.toUpperCase().endsWith('.MOV');
+
+  Map<String, dynamic> toJson() => {
+        'handle': handle,
+        'storageId': storageId,
+        'format': format,
+        'size': size,
+        'fileName': fileName,
+        'captureDate': captureDate,
+      };
+
+  factory CameraFileItem.fromJson(Map<String, dynamic> json) => CameraFileItem(
+        handle: json['handle'] as int,
+        storageId: json['storageId'] as int,
+        format: json['format'] as int,
+        size: json['size'] as int,
+        fileName: json['fileName'] as String,
+        captureDate: (json['captureDate'] as String?) ?? '',
+      );
+
+  String get sizeFormatted {
+    if (size >= 1024 * 1024 * 1024) {
+      return '${(size / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    } else if (size >= 1024 * 1024) {
+      return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
+    } else {
+      return '${(size / 1024).toStringAsFixed(1)} KB';
+    }
+  }
+}
+
+/// 抽象相机硬件驱动标准接口
+abstract class CameraDriver {
+  CameraConnectionState get state;
+  bool get isConnected;
+  String get cameraModel;
+  int get batteryLevel; // 0 - 100
+  bool get isSingleSlotCamera;
+  List<int> get availableStorageIds;
+  Stream<CameraConnectionState> get connectionStateStream;
+
+  // ------------------------------------
+  // 连接控制
+  // ------------------------------------
+  Future<void> connect(String host, {int port = 15740, void Function(String msg)? onLog});
+  Future<void> disconnect();
+  Future<List<int>> listStorageIds();
+
+  // ------------------------------------
+  // LiveView 取景与监看
+  // ------------------------------------
+  Future<void> startLiveView();
+  Future<Uint8List?> fetchLiveViewFrame();
+  Future<void> endLiveView();
+
+  // ------------------------------------
+  // 快门与调参控制
+  // ------------------------------------
+  Future<void> triggerShutter();
+  Future<void> autofocus();
+  Future<void> driveZoom({required bool isTele, int speed = 5});
+  Future<void> stopDriveZoom();
+  Future<CameraExposureParams> fetchExposureParams();
+  Future<bool> setAperture(double fNumber);
+  Future<bool> setShutterSpeed(int numerator, int denominator);
+  Future<bool> setIso(int iso);
+  Future<bool> setExposureCompensation(int evMillisteps);
+
+  // ------------------------------------
+  // 媒体浏览与下载
+  // ------------------------------------
+  Future<List<int>> listObjectHandles([int? storageId]);
+  Future<CameraFileItem?> getObjectInfo(int handle);
+  Future<Uint8List> getThumbnail(int handle);
+  Future<Uint8List> downloadPartialObject(int handle, int offset, int maxBytes);
+  Future<Uint8List> downloadFullObject(int handle, int totalSize, {Function(int current, int total)? onProgress});
+
+  // ------------------------------------
+  // 新拍照事件流 (边拍边传)
+  // ------------------------------------
+  Stream<CameraFileItem> get onPhotoCaptured;
+}
+
+/// 相机实时曝光与镜头参数实体 (LiveView HUD 监看)
+class CameraExposureParams {
+  final String aperture; // e.g. "f/2.8"
+  final String shutterSpeed; // e.g. "1/250s"
+  final String iso; // e.g. "ISO 400"
+  final String exposureComp; // e.g. "±0.0 EV" or "+0.3 EV"
+  final String programMode; // e.g. "M", "A", "S", "P", "AUTO"
+  final String focalLength; // e.g. "50mm"
+  final String lensInfo; // e.g. "24-70mm"
+  final int batteryLevel; // e.g. 85
+
+  const CameraExposureParams({
+    this.aperture = '--',
+    this.shutterSpeed = '--',
+    this.iso = '--',
+    this.exposureComp = '--',
+    this.programMode = '--',
+    this.focalLength = '--',
+    this.lensInfo = '--',
+    this.batteryLevel = 100,
+  });
+}

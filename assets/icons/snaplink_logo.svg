@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>R3 — 闪电 S + 尖端 L</title>
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="#121214"/>
+  <g transform="translate(-20,0)">
+    <polygon fill="#FFC800"
+      transform="translate(195,256) scale(0.865) translate(-268.0,-244.6)"
+      points="375.7,125.4 334.3,117.4 147.6,206.3 275.6,292.2 178.2,324.3 153.7,358.6 193.8,371.7 388.4,307.8 248.4,213.7 355.7,162.6"/>
+    <!-- L: 两端收尖, 与闪电同族 -->
+    <polygon fill="#FFC800"
+      points="362,132 370,156 370,326 432,326 468,356 432,366 330,366 330,156"/>
+  </g>
+</svg>

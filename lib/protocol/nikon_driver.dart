@@ -1,0 +1,1061 @@
+import 'dart:async';
+import 'dart:typed_data';
+import '../core/constants/ptp_opcodes.dart';
+import '../core/utils/byte_buffer_ext.dart';
+import 'camera_driver.dart';
+import 'camera_native_bridge.dart';
+import 'nikon_liveview_parser.dart';
+import 'ptp_ip_client.dart';
+import 'ptp_packet.dart';
+
+/// 尼康 PTP 设备信息完整描述实体 (0x1001 GetDeviceInfo)
+/// 100% 还原官方 SnapBridge DeviceInfoDataset.java 反编译规范
+class NikonDeviceInfo {
+  final int standardVersion;
+  final int vendorExtensionId;
+  final int vendorExtensionVersion;
+  final String vendorExtensionDesc;
+  final int functionalMode;
+  final List<int> operationsSupported;
+  final List<int> eventsSupported;
+  final List<int> devicePropertiesSupported;
+  final List<int> captureFormats;
+  final List<int> playbackFormats;
+  final String manufacturer;
+  final String model;
+  final String deviceVersion;
+  final String serialNumber;
+
+  const NikonDeviceInfo({
+    this.standardVersion = 100,
+    this.vendorExtensionId = 0,
+    this.vendorExtensionVersion = 0,
+    this.vendorExtensionDesc = '',
+    this.functionalMode = 0,
+    this.operationsSupported = const [],
+    this.eventsSupported = const [],
+    this.devicePropertiesSupported = const [],
+    this.captureFormats = const [],
+    this.playbackFormats = const [],
+    this.manufacturer = 'Nikon Corporation',
+    this.model = 'Nikon Camera',
+    this.deviceVersion = '',
+    this.serialNumber = '',
+  });
+
+  /// 从 PTP 二进制数据流中反序列化 DeviceInfo 数据集
+  static NikonDeviceInfo parse(Uint8List data) {
+    if (data.length < 16) return const NikonDeviceInfo();
+
+    try {
+      final reader = PtpByteReader(data);
+      final standardVersion = reader.readUint16();
+      final vendorExtensionId = reader.readUint32();
+      final vendorExtensionVersion = reader.readUint16();
+      final vendorExtensionDesc = reader.readPtpString();
+      final functionalMode = reader.readUint16();
+
+      final operations = reader.readUint16Array();
+      final events = reader.readUint16Array();
+      final deviceProperties = reader.readUint16Array();
+      final captureFormats = reader.readUint16Array();
+      final playbackFormats = reader.readUint16Array();
+
+      final manufacturer = reader.readPtpString();
+      final model = reader.readPtpString();
+      final deviceVersion = reader.readPtpString();
+      final serialNumber = reader.readPtpString();
+
+      if (model.trim().isNotEmpty && model.trim() != 'Nikon Camera') {
+        return NikonDeviceInfo(
+          standardVersion: standardVersion,
+          vendorExtensionId: vendorExtensionId,
+          vendorExtensionVersion: vendorExtensionVersion,
+          vendorExtensionDesc: vendorExtensionDesc,
+          functionalMode: functionalMode,
+          operationsSupported: operations,
+          eventsSupported: events,
+          devicePropertiesSupported: deviceProperties,
+          captureFormats: captureFormats,
+          playbackFormats: playbackFormats,
+          manufacturer: manufacturer.isNotEmpty ? manufacturer : 'Nikon Corporation',
+          model: normalizeModelName(model),
+          deviceVersion: deviceVersion.trim(),
+          serialNumber: serialNumber.trim(),
+        );
+      }
+    } catch (_) {
+      // 容错: 若特定机型字符串偏移不同，进入备用扫描
+    }
+
+    // 备用启发式扫描: 遍历数据负载中合法的 PTP UTF-16LE 字符串
+    String matchedModel = 'Nikon Camera';
+    String matchedSerial = '';
+    String matchedVersion = '';
+    try {
+      for (var i = 0; i < data.length - 4; i++) {
+        final len = data[i];
+        if (len >= 3 && len <= 32 && i + 1 + len * 2 <= data.length) {
+          final chars = <int>[];
+          var validUtf16 = true;
+          for (var j = 0; j < len; j++) {
+            final c = data[i + 1 + j * 2] | (data[i + 2 + j * 2] << 8);
+            if (j == len - 1) {
+              if (c != 0) validUtf16 = false; // 结尾必须是 0x0000
+            } else if (c < 32 || c > 126) {
+              validUtf16 = false;
+              break;
+            } else {
+              chars.add(c);
+            }
+          }
+          if (validUtf16 && chars.isNotEmpty) {
+            final s = String.fromCharCodes(chars).trim();
+            final lower = s.toLowerCase();
+            if (lower.contains('corporation')) continue;
+
+            // 匹配尼康型号 (例如: NIKON Z 30, NIKON Z 8, NIKON Z 6_2, NIKON Z fc, NIKON D850)
+            if (matchedModel == 'Nikon Camera' &&
+                RegExp(r'^(NIKON\s+[A-Za-z0-9_\-\s]+|NIKON_[A-Za-z0-9_]+|Z\s*[0-9]+[A-Za-z_]*|D[0-9]{3,4}[A-Za-z]*)$', caseSensitive: false).hasMatch(s)) {
+              matchedModel = normalizeModelName(s);
+            } else if (matchedVersion.isEmpty && RegExp(r'^[0-9]\.[0-9]{2}(\.[0-9]+)?$').hasMatch(s)) {
+              matchedVersion = s;
+            } else if (matchedSerial.isEmpty && RegExp(r'^[0-9]{6,10}$').hasMatch(s)) {
+              matchedSerial = s;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 备用 ASCII 连续字符串探测 (部分固件在 DeviceInfo 中写入 ASCII 码)
+    if (matchedModel == 'Nikon Camera') {
+      try {
+        final asciiChars = <int>[];
+        for (final b in data) {
+          if (b >= 32 && b <= 126) {
+            asciiChars.add(b);
+          } else {
+            asciiChars.add(32);
+          }
+        }
+        final asciiStr = String.fromCharCodes(asciiChars);
+        final match = RegExp(r'(NIKON\s+Z\s*[0-9]+[A-Za-z_]*|NIKON\s+Z\s*fc|NIKON\s+D[0-9]{3,4}[A-Za-z]*|Z\s*[0-9]+[A-Za-z_]*|Z\s*fc)', caseSensitive: false).firstMatch(asciiStr);
+        if (match != null) {
+          matchedModel = normalizeModelName(match.group(0)!);
+        }
+      } catch (_) {}
+    }
+
+    return NikonDeviceInfo(
+      model: normalizeModelName(matchedModel),
+      serialNumber: matchedSerial,
+      deviceVersion: matchedVersion,
+    );
+  }
+
+  /// 尼康全系列型号归一化处理器
+  static String normalizeModelName(String model) {
+    final m = model.trim();
+    final upper = m.toUpperCase();
+    if (upper.contains('Z 30') || upper.contains('Z30') || upper.contains('Z_30')) return 'NIKON Z 30';
+    if (upper.contains('Z 50') || upper.contains('Z50') || upper.contains('Z_50')) return 'NIKON Z 50';
+    if (upper.contains('Z FC') || upper.contains('ZFC') || upper.contains('Z_FC')) return 'NIKON Z fc';
+    if (upper.contains('Z 8') || upper.contains('Z8') || upper.contains('Z_8')) return 'NIKON Z 8';
+    if (upper.contains('Z 9') || upper.contains('Z9') || upper.contains('Z_9')) return 'NIKON Z 9';
+    if (upper.contains('Z 6_3') || upper.contains('Z6III') || upper.contains('Z 6III')) return 'NIKON Z 6III';
+    if (upper.contains('Z 6_2') || upper.contains('Z6II') || upper.contains('Z 6II')) return 'NIKON Z 6II';
+    if (upper.contains('Z 6') || upper.contains('Z6') || upper.contains('Z_6')) return 'NIKON Z 6';
+    if (upper.contains('Z 7_2') || upper.contains('Z7II') || upper.contains('Z 7II')) return 'NIKON Z 7II';
+    if (upper.contains('Z 7') || upper.contains('Z7') || upper.contains('Z_7')) return 'NIKON Z 7';
+    if (upper.contains('D850')) return 'NIKON D850';
+    if (upper.contains('D780')) return 'NIKON D780';
+    if (upper.contains('D750')) return 'NIKON D750';
+    if (upper.contains('D500')) return 'NIKON D500';
+    return m.isEmpty ? 'Nikon Camera' : m;
+  }
+}
+
+/// 尼康专属相机硬件协议驱动
+/// 100% 还原反编译得到的 Nikon 私有操作码与自适应降级特性
+class NikonDriver implements CameraDriver {
+  PtpIpClient? _client;
+  CameraConnectionState _state = CameraConnectionState.disconnected;
+  bool _useLegacyLiveView0x9203 = false;
+  String _cameraModel = 'Nikon Camera';
+  int _batteryLevel = 100;
+  NikonDeviceInfo _deviceInfo = const NikonDeviceInfo();
+  void Function(String msg)? _logCallback;
+
+  final StreamController<CameraFileItem> _photoCapturedController =
+      StreamController<CameraFileItem>.broadcast();
+  final StreamController<CameraConnectionState> _stateController =
+      StreamController<CameraConnectionState>.broadcast();
+
+  List<int> _detectedStorageIds = [];
+  final Map<int, CameraFileItem> _objectInfoCache = {};
+  final Map<int, Uint8List> _thumbCache = {};
+
+  @override
+  CameraConnectionState get state => _state;
+
+  @override
+  Stream<CameraConnectionState> get connectionStateStream => _stateController.stream;
+
+  @override
+  bool get isConnected => _state == CameraConnectionState.connected && (_client?.isConnected ?? false);
+
+  @override
+  String get cameraModel => _cameraModel;
+
+  @override
+  int get batteryLevel => _batteryLevel;
+
+  @override
+  List<int> get availableStorageIds => List.unmodifiable(_detectedStorageIds);
+
+  @override
+  bool get isSingleSlotCamera {
+    final m = _cameraModel.toUpperCase();
+    if (m.contains('Z 30') || m.contains('Z30') ||
+        m.contains('Z 50') || m.contains('Z50') ||
+        m.contains('Z FC') || m.contains('ZFC') ||
+        m.contains('COOLPIX') ||
+        m.contains('D3') || m.contains('D5')) {
+      return true;
+    }
+    if (_detectedStorageIds.isNotEmpty && _detectedStorageIds.length <= 1) {
+      return true;
+    }
+    return false;
+  }
+
+  NikonDeviceInfo get deviceInfo => _deviceInfo;
+
+  @override
+  Stream<CameraFileItem> get onPhotoCaptured => _photoCapturedController.stream;
+
+  @override
+  Future<void> connect(String host, {int port = 15740, void Function(String msg)? onLog}) async {
+    _logCallback = onLog;
+    _state = CameraConnectionState.connecting;
+    _stateController.add(_state);
+    try {
+      // 优先从当前 Wi-Fi SSID 嗅探机型
+      try {
+        final wifi = await CameraNativeBridge.getWifiInfo();
+        final ssidUpper = wifi.ssid.toUpperCase();
+        if (ssidUpper.contains('Z_30') || ssidUpper.contains('Z30') || ssidUpper.contains('Z 30')) {
+          _cameraModel = 'NIKON Z 30';
+        } else if (ssidUpper.contains('Z_50') || ssidUpper.contains('Z50') || ssidUpper.contains('Z 50')) {
+          _cameraModel = 'NIKON Z 50';
+        } else if (ssidUpper.contains('Z_FC') || ssidUpper.contains('ZFC')) {
+          _cameraModel = 'NIKON Z fc';
+        } else if (ssidUpper.contains('Z_8') || ssidUpper.contains('Z8')) {
+          _cameraModel = 'NIKON Z 8';
+        } else if (ssidUpper.contains('Z_9') || ssidUpper.contains('Z9')) {
+          _cameraModel = 'NIKON Z 9';
+        } else if (ssidUpper.contains('D850')) {
+          _cameraModel = 'NIKON D850';
+        }
+      } catch (_) {}
+
+      // 自动绑定 Android 进程至 Wi-Fi 热点接口，优先锁定到路由网段
+      try {
+        await CameraNativeBridge.bindCameraWifi(targetHost: host);
+      } catch (_) {}
+
+      _client = PtpIpClient(host: host, port: port, onLog: onLog);
+      await _client!.connect();
+      _state = CameraConnectionState.connected;
+      _stateController.add(_state);
+
+      // 监听相机推送事件 (ObjectAdded 0x4002) 用于边拍边传
+      _client!.events.listen(_handleCameraEvent);
+
+      // 查询设备信息以获取具体型号与支持能力集
+      try {
+        await _queryDeviceInfo();
+      } catch (e) {
+        onLog?.call('查询相机设备信息提示: $e');
+      }
+
+      // 查询电池电量 (0x5001 BatteryLevel)
+      try {
+        await _queryBatteryLevel();
+      } catch (_) {}
+    } catch (e) {
+      _state = CameraConnectionState.error;
+      _stateController.add(_state);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> disconnect() async {
+    await _client?.disconnect();
+    _client = null;
+    _state = CameraConnectionState.disconnected;
+    // dispose 场景下控制器可能已关闭，避免向已关闭的 StreamController 发送事件
+    if (!_stateController.isClosed) {
+      _stateController.add(_state);
+    }
+    _objectInfoCache.clear();
+    _thumbCache.clear();
+    _detectedStorageIds.clear();
+    try {
+      await CameraNativeBridge.unbindWifi();
+    } catch (_) {}
+  }
+
+  // ==========================================
+  // ==========================================
+  // LiveView 取景与降级机制 (逆向核心算法)
+  // ==========================================
+
+  @override
+  Future<void> startLiveView() async {
+    if (!isConnected) return;
+
+    // 1. 切换工作模式为 Host 控制模式 (0x90C2 ChangeCameraMode, param = [1])
+    // 逆向证实: 尼康微单 (Z 系列) 与经典单反开启实时取景的强制前置握手
+    try {
+      await _client!.executeOperation(PtpOpCodes.nikonChangeCameraMode, [1]);
+      _logCallback?.call('已切换相机工作模式为 Host 控制模式 (0x90C2)');
+    } catch (_) {}
+
+    // 2. 检查 DeviceReady (0x90C8)
+    try {
+      await _client!.executeOperation(PtpOpCodes.nikonDeviceReady);
+    } catch (_) {}
+
+    // 3. 对齐官方 SnapBridge StartLiveViewAction.java:400
+    // 配置 0x5013 (StillCaptureMode) 为 1
+    try {
+      await _client!.executeOperation(PtpOpCodes.setDevicePropValue, [0x5013, 1]);
+    } catch (_) {}
+
+    // 官方缓冲 300ms 让机械结构/感光元件就绪 (StartLiveViewAction.java:405)
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // 4. 发送 0x9201 (Nikon_StartLiveView)，带 0x2019 (DeviceBusy) 10 次退避重试 (对齐 SnapBridge 规范)
+    var started = false;
+    for (var i = 0; i < 10; i++) {
+      try {
+        await _client!.executeOperation(PtpOpCodes.nikonStartLiveView);
+        started = true;
+        _logCallback?.call('实时取景硬件流开启成功 (0x9201)');
+        break;
+      } on PtpException catch (e) {
+        if (e.responseCode == PtpOpCodes.responseDeviceBusy) {
+          _logCallback?.call('相机传感器/快门忙 (0x2019)，正在重试开启取景 (${i + 1}/10)...');
+          await Future.delayed(const Duration(milliseconds: 500));
+          continue;
+        }
+        _logCallback?.call('开启取景指令异常: $e');
+        rethrow;
+      } catch (e) {
+        _logCallback?.call('开启取景通信异常: $e');
+        rethrow;
+      }
+    }
+
+    if (!started) {
+      throw Exception('开启取景超时：相机传感器持续忙碌');
+    }
+  }
+
+  @override
+  Future<CameraExposureParams> fetchExposureParams() async {
+    if (!isConnected) return const CameraExposureParams();
+
+    String aperture = '--';
+    String shutterSpeed = '--';
+    String iso = '--';
+    String exposureComp = '--';
+    String programMode = '--';
+    String focalLength = '--';
+    String lensInfo = '--';
+    int bat = _batteryLevel;
+
+    // 1. 光圈 F-Number (0x5007): 2 字节小端无符号，实际值 = value / 100
+    try {
+      final fData = await _client!.executeDataIn(PtpOpCodes.getDevicePropValue, [0x5007]);
+      if (fData.length >= 2) {
+        final val = ByteData.sublistView(fData).getUint16(0, Endian.little);
+        if (val > 0 && val < 65000) {
+          aperture = 'f/${(val / 100.0).toStringAsFixed(1)}';
+        }
+      }
+    } catch (_) {}
+
+    // 2. 快门速度 ShutterSpeed (0xD100 / 0x500D)
+    // 逆向证实 (nd.java): 32位整数，高 16 位为分子，低 16 位为分母
+    try {
+      Uint8List ssData = Uint8List(0);
+      try {
+        ssData = await _client!.executeDataIn(PtpOpCodes.getDevicePropValue, [0xD100]);
+      } catch (_) {
+        try {
+          ssData = await _client!.executeDataIn(PtpOpCodes.getDevicePropValue, [0x500D]);
+        } catch (_) {}
+      }
+      if (ssData.length >= 4) {
+        final rawVal = ByteData.sublistView(ssData).getUint32(0, Endian.little);
+        final num = (rawVal >> 16) & 0xFFFF;
+        final den = rawVal & 0xFFFF;
+        if (num == 65535 && den == 65535) {
+          shutterSpeed = 'BULB';
+        } else if (num == 65535 && den == 65533) {
+          shutterSpeed = 'TIME';
+        } else if (num == 65535 && den == 65534) {
+          shutterSpeed = 'FLASH';
+        } else if (den == 1) {
+          shutterSpeed = '$num"';
+        } else if (den > 1) {
+          if (num == 1) {
+            shutterSpeed = '1/${den}s';
+          } else if (num > 0 && den % num == 0) {
+            shutterSpeed = '1/${(den / num).round()}s';
+          } else {
+            shutterSpeed = '$num/${den}s';
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. 感光度 ISO (0x500F / 0xD0B4)
+    try {
+      Uint8List isoData = Uint8List(0);
+      try {
+        isoData = await _client!.executeDataIn(PtpOpCodes.getDevicePropValue, [0x500F]);
+      } catch (_) {
+        try {
+          isoData = await _client!.executeDataIn(PtpOpCodes.getDevicePropValue, [0xD0B4]);
+        } catch (_) {}
+      }
+      if (isoData.length >= 4) {
+        final isoVal = ByteData.sublistView(isoData).getUint32(0, Endian.little);
+        if (isoVal > 0 && isoVal < 1000000) iso = 'ISO $isoVal';
+      } else if (isoData.length >= 2) {
+        final isoVal = ByteData.sublistView(isoData).getUint16(0, Endian.little);
+        if (isoVal > 0) iso = 'ISO $isoVal';
+      }
+    } catch (_) {}
+
+    // 4. 曝光补偿 ExposureCompensation (0x5010): 2 字节小端有符号，千分档 EV
+    try {
+      final evData = await _client!.executeDataIn(PtpOpCodes.getDevicePropValue, [0x5010]);
+      if (evData.length >= 2) {
+        final rawEv = ByteData.sublistView(evData).getInt16(0, Endian.little);
+        final ev = rawEv / 1000.0;
+        if (ev > 0) {
+          exposureComp = '+${ev.toStringAsFixed(1)} EV';
+        } else if (ev < 0) {
+          exposureComp = '${ev.toStringAsFixed(1)} EV';
+        } else {
+          exposureComp = '±0.0 EV';
+        }
+      }
+    } catch (_) {}
+
+    // 5. 曝光模式 ProgramMode (0x500E)
+    // 逆向证实 (y9.java): 1: M, 2: P, 3: A, 4: S, 0x8010: AUTO
+    try {
+      final modeData = await _client!.executeDataIn(PtpOpCodes.getDevicePropValue, [0x500E]);
+      if (modeData.length >= 2) {
+        final m = ByteData.sublistView(modeData).getUint16(0, Endian.little);
+        if (m == 1) {
+          programMode = 'M';
+        } else if (m == 2) {
+          programMode = 'P';
+        } else if (m == 3) {
+          programMode = 'A';
+        } else if (m == 4) {
+          programMode = 'S';
+        } else if (m == 0x8010 || m == 0x8011) {
+          programMode = 'AUTO';
+        } else {
+          programMode = 'MODE $m';
+        }
+      }
+    } catch (_) {}
+
+    // 6. 当前焦距 FocalLength (0x5008)
+    try {
+      final flData = await _client!.executeDataIn(PtpOpCodes.getDevicePropValue, [0x5008]);
+      if (flData.length >= 4) {
+        var fl = ByteData.sublistView(flData).getUint32(0, Endian.little);
+        if (fl > 1000) fl = (fl / 100).round();
+        if (fl > 0 && fl < 2000) focalLength = '${fl}mm';
+      }
+    } catch (_) {}
+
+    // 7. 镜头型号/焦段探测 LensFocalMin (0xD0E3) & LensFocalMax (0xD0E4)
+    try {
+      int minF = 0;
+      int maxF = 0;
+      try {
+        final minData = await _client!.executeDataIn(PtpOpCodes.getDevicePropValue, [0xD0E3]);
+        if (minData.length >= 4) {
+          minF = ByteData.sublistView(minData).getUint32(0, Endian.little);
+          if (minF > 1000) minF = (minF / 100).round();
+        }
+      } catch (_) {}
+      try {
+        final maxData = await _client!.executeDataIn(PtpOpCodes.getDevicePropValue, [0xD0E4]);
+        if (maxData.length >= 4) {
+          maxF = ByteData.sublistView(maxData).getUint32(0, Endian.little);
+          if (maxF > 1000) maxF = (maxF / 100).round();
+        }
+      } catch (_) {}
+
+      if (minF > 0 && maxF > 0) {
+        if (minF == maxF) {
+          lensInfo = '$minF mm 定焦';
+        } else {
+          lensInfo = '$minF-${maxF}mm';
+        }
+      }
+    } catch (_) {}
+
+    return CameraExposureParams(
+      aperture: aperture,
+      shutterSpeed: shutterSpeed,
+      iso: iso,
+      exposureComp: exposureComp,
+      programMode: programMode,
+      focalLength: focalLength,
+      lensInfo: lensInfo,
+      batteryLevel: bat,
+    );
+  }
+
+  /// 获取经过结构体解包的完整 LiveView 数据帧 (含 JPEG、对焦框、水平仪与旋转角)
+  Future<NikonLiveViewFrame?> fetchParsedLiveViewFrame() async {
+    if (!isConnected) return null;
+
+    Uint8List? raw;
+    // 1. 如果此前已检测出旧机型，固定走 0x9203 经典协议
+    if (_useLegacyLiveView0x9203) {
+      try {
+        raw = await _client!.executeDataIn(PtpOpCodes.nikonGetLiveViewImage);
+      } on PtpException catch (e) {
+        if (e.responseCode == PtpOpCodes.responseDeviceBusy) return null;
+        return null;
+      } catch (_) {
+        return null;
+      }
+    } else {
+      // 2. 优先尝试 0x9428 (Nikon_GetLiveViewImageEx)
+      try {
+        raw = await _client!.executeDataIn(PtpOpCodes.nikonGetLiveViewImageEx);
+      } on PtpException catch (e) {
+        if (e.responseCode == PtpOpCodes.responseDeviceBusy) {
+          return null; // 设备忙时平滑跳过当前帧
+        }
+        // 3. 拦截 0x2005 (Operation Not Supported 操作不受支持)
+        if (e.opCode == PtpOpCodes.nikonGetLiveViewImageEx &&
+            e.responseCode == PtpOpCodes.responseOperationNotSupported) {
+          // 永久标记降级
+          _useLegacyLiveView0x9203 = true;
+          _logCallback?.call('相机不支持 0x9428 Ex 取景，自动降级至 0x9203 经典协议');
+          try {
+            raw = await _client!.executeDataIn(PtpOpCodes.nikonGetLiveViewImage);
+          } catch (_) {
+            return null;
+          }
+        } else {
+          return null;
+        }
+      } catch (_) {
+        return null;
+      }
+    }
+
+    if (raw.isEmpty) return null;
+    return NikonLiveViewParser.parse(raw);
+  }
+
+  @override
+  Future<Uint8List?> fetchLiveViewFrame() async {
+    final frame = await fetchParsedLiveViewFrame();
+    return frame?.jpegData;
+  }
+
+  @override
+  Future<void> endLiveView() async {
+    if (!isConnected) return;
+    try {
+      for (var i = 0; i < 5; i++) {
+        try {
+          await _client!.executeOperation(PtpOpCodes.nikonEndLiveView);
+          break;
+        } on PtpException catch (e) {
+          if (e.responseCode == PtpOpCodes.responseDeviceBusy) {
+            await Future.delayed(const Duration(milliseconds: 200));
+            continue;
+          }
+          break;
+        }
+      }
+    } catch (_) {}
+
+    // 恢复相机工作模式为本地 Camera 模式 (0x90C2, [0])
+    try {
+      await _client!.executeOperation(PtpOpCodes.nikonChangeCameraMode, [0]);
+      _logCallback?.call('相机工作模式已恢复为本地模式 (0x90C2)');
+    } catch (_) {}
+  }
+
+  // ==========================================
+  // 快门与对焦控制
+  // ==========================================
+
+  @override
+  Future<void> triggerShutter() async {
+    if (!isConnected) return;
+    try {
+      // 官方 SnapBridge 规范: 0x9207 (Nikon_CaptureToCard 拍照存卡)
+      // Param 1 = 0xFFFFFFFE (-2: 自动对焦合焦击发), Param 2 = 0 (CARD 机内卡存盘)
+      await _client!.executeOperation(PtpOpCodes.nikonCaptureToCard, [0xFFFFFFFE, 0]);
+      _logCallback?.call('快门释放成功: 0x9207 [0xFFFFFFFE, 0]');
+    } on PtpException catch (e) {
+      _logCallback?.call('0x9207 拍摄异常 (0x${e.responseCode.toRadixString(16)})，尝试非合焦直接击发...');
+      try {
+        await _client!.executeOperation(PtpOpCodes.nikonCaptureToCard, [0xFFFFFFFF, 0]);
+        _logCallback?.call('快门释放成功: 0x9207 [0xFFFFFFFF, 0]');
+      } catch (_) {
+        try {
+          // 最终降级标准 PTP InitiateCapture (0x100E, [0, 0])
+          await _client!.executeOperation(PtpOpCodes.initiateCapture, [0, 0]);
+          _logCallback?.call('标准快门释放成功: 0x100E [0, 0]');
+        } catch (e2) {
+          _logCallback?.call('快门触发失败: $e2');
+          rethrow;
+        }
+      }
+    }
+  }
+
+  @override
+  Future<void> autofocus() async {
+    if (!isConnected) return;
+    // 发送 0x90C1 (Nikon_AfDrive 驱动对焦马达)
+    await _client!.executeOperation(PtpOpCodes.nikonAfDrive);
+  }
+
+  @override
+  Future<void> driveZoom({required bool isTele, int speed = 5}) async {
+    if (!isConnected) return;
+    try {
+      // 发送 0x9464 (Nikon_ZZoomDrive 电动变焦驱动)
+      // 参数 1: 1 (START), 参数 2: 1 (WIDE) / 2 (TELE), 参数 3: 速度 (1..10)
+      await _client!.executeOperation(PtpOpCodes.nikonZZoomDrive, [
+        1,
+        isTele ? 2 : 1,
+        speed.clamp(1, 10),
+      ]);
+      _logCallback?.call('驱动镜头变焦: ${isTele ? "TELE(长焦)" : "WIDE(广角)"} 速度: $speed');
+    } catch (_) {}
+  }
+
+  @override
+  Future<void> stopDriveZoom() async {
+    if (!isConnected) return;
+    try {
+      // 发送 0x9464 (Nikon_ZZoomDrive 停止变焦)
+      // 参数 1: 0 (STOP), 参数 2: 0, 参数 3: 0
+      await _client!.executeOperation(PtpOpCodes.nikonZZoomDrive, [0, 0, 0]);
+      _logCallback?.call('停止镜头变焦驱动');
+    } catch (_) {}
+  }
+
+  @override
+  Future<bool> setAperture(double fNumber) async {
+    if (!isConnected) return false;
+    try {
+      // 0x5007: FNumber (uint16, 乘以 100，如 f/2.8 -> 280)
+      final val = (fNumber * 100).round();
+      final data = Uint8List(2);
+      ByteData.sublistView(data).setUint16(0, val, Endian.little);
+      await _client!.executeDataOut(PtpOpCodes.setDevicePropValue, data, [0x5007]);
+      _logCallback?.call('成功调整光圈至: f/${fNumber.toStringAsFixed(1)}');
+      return true;
+    } catch (e) {
+      _logCallback?.call('设置光圈失败: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> setShutterSpeed(int numerator, int denominator) async {
+    if (!isConnected) return false;
+    try {
+      // 尼康私有快门属性 0xD100 (4 字节: num << 16 | den, 小端格式)
+      final rawVal = ((numerator & 0xFFFF) << 16) | (denominator & 0xFFFF);
+      final data = Uint8List(4);
+      ByteData.sublistView(data).setUint32(0, rawVal, Endian.little);
+      try {
+        await _client!.executeDataOut(PtpOpCodes.setDevicePropValue, data, [0xD100]);
+        _logCallback?.call('成功调整快门速度至: $numerator/${denominator}s (0xD100)');
+        return true;
+      } catch (_) {
+        // 尝试标准 0x500D (ExposureTime)
+        await _client!.executeDataOut(PtpOpCodes.setDevicePropValue, data, [0x500D]);
+        _logCallback?.call('成功调整快门速度至: $numerator/${denominator}s (0x500D)');
+        return true;
+      }
+    } catch (e) {
+      _logCallback?.call('设置快门速度失败: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> setIso(int iso) async {
+    if (!isConnected) return false;
+    try {
+      // 优先标准 PTP 0x500F (uint16)
+      final data = Uint8List(2);
+      ByteData.sublistView(data).setUint16(0, iso, Endian.little);
+      try {
+        await _client!.executeDataOut(PtpOpCodes.setDevicePropValue, data, [0x500F]);
+        _logCallback?.call('成功调整 ISO 至: $iso (0x500F)');
+        return true;
+      } catch (_) {
+        // 降级 0xD0B4 (uint32 或 uint16)
+        final data32 = Uint8List(4);
+        ByteData.sublistView(data32).setUint32(0, iso, Endian.little);
+        await _client!.executeDataOut(PtpOpCodes.setDevicePropValue, data32, [0xD0B4]);
+        _logCallback?.call('成功调整 ISO 至: $iso (0xD0B4)');
+        return true;
+      }
+    } catch (e) {
+      _logCallback?.call('设置 ISO 失败: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> setExposureCompensation(int evMillisteps) async {
+    if (!isConnected) return false;
+    try {
+      // 0x5010: ExposureBiasCompensation (int16, 千分档 EV，例如 +0.3EV = +333)
+      final data = Uint8List(2);
+      ByteData.sublistView(data).setInt16(0, evMillisteps, Endian.little);
+      await _client!.executeDataOut(PtpOpCodes.setDevicePropValue, data, [0x5010]);
+      final evVal = (evMillisteps / 1000.0).toStringAsFixed(1);
+      _logCallback?.call('成功调整曝光补偿至: ${evMillisteps >= 0 ? "+$evVal" : evVal} EV');
+      return true;
+    } catch (e) {
+      _logCallback?.call('设置曝光补偿失败: $e');
+      return false;
+    }
+  }
+
+
+  // ==========================================
+  // 媒体管理与 4MB 分块流式拉取
+  // ==========================================
+
+  @override
+  Future<List<int>> listStorageIds() async {
+    if (!isConnected) return _detectedStorageIds;
+    try {
+      final storageData = await _client!.executeDataIn(PtpOpCodes.getStorageIDs);
+      final ids = _parseUint32Array(storageData);
+      if (ids.isNotEmpty) {
+        _detectedStorageIds = ids;
+        return _detectedStorageIds;
+      }
+    } catch (_) {}
+    if (_detectedStorageIds.isEmpty) {
+      _detectedStorageIds = [0x00010001];
+    }
+    return _detectedStorageIds;
+  }
+
+  @override
+  Future<List<int>> listObjectHandles([int? storageId]) async {
+    if (!isConnected) return [];
+
+    // 获取所有可用卡槽
+    List<int> storages = [];
+    if (storageId != null) {
+      storages = [storageId];
+    } else {
+      storages = await listStorageIds();
+    }
+
+    if (storages.isEmpty) {
+      // 探测默认卡槽与通配卡槽 (Slot 1, Slot 2, 全卡槽)
+      storages = [0x00010001, 0x00020001, 0xFFFFFFFF];
+    }
+
+    final allFileHandles = <int>{};
+
+    for (final sId in storages) {
+      try {
+        final found = await _scanStorageFiles(sId);
+        if (found.isNotEmpty) {
+          allFileHandles.addAll(found);
+          _logCallback?.call('卡槽 0x${sId.toRadixString(16)} 成功检索到 ${found.length} 个媒体文件');
+        }
+      } catch (_) {}
+    }
+
+    // 若按卡槽未找到且未指定卡槽，尝试全卡槽通配扫描
+    if (allFileHandles.isEmpty && storageId == null) {
+      try {
+        final found = await _scanStorageFiles(0xFFFFFFFF);
+        allFileHandles.addAll(found);
+      } catch (_) {}
+    }
+
+    return allFileHandles.toList();
+  }
+
+  /// 扫描指定存储卷下的所有文件 (支持扁平递归与 DCIM/延时摄影目录树递归双引擎)
+  Future<List<int>> _scanStorageFiles(int storageId) async {
+    final allHandles = <int>[];
+
+    // 引擎 1: 标准 PTP 全局通配句柄查询 (Parent = 0xFFFFFFFF 查询存储卡内所有文件及目录)
+    try {
+      final handleData = await _client!.executeDataIn(
+        PtpOpCodes.getObjectHandles,
+        [storageId, 0, 0xFFFFFFFF],
+      );
+      final handles = _parseUint32Array(handleData);
+      if (handles.length > 2) {
+        // 0xFFFFFFFF 在 PTP 协议中代表存储卡内全部对象（包含星空延时新文件夹中的照片）
+        allHandles.addAll(handles);
+        _logCallback?.call('PTP 0xFFFFFFFF 全局扁平化检索到 ${handles.length} 个对象句柄');
+        return allHandles;
+      }
+    } catch (e) {
+      _logCallback?.call('0xFFFFFFFF 全局查询异常，进入目录树扫描: $e');
+    }
+
+    // 引擎 2: 官方 SnapBridge 深度目录树扫描 (覆盖根目录、DCIM、以及星空延时/定时拍摄生成的所有子文件夹如 100NCZ_3, 101NCZ_3, 102NCZ_3 等)
+    try {
+      // 1. 获取根目录对象 (Parent = 0)
+      final rootData = await _client!.executeDataIn(
+        PtpOpCodes.getObjectHandles,
+        [storageId, 0, 0],
+      );
+      final rootHandles = _parseUint32Array(rootData);
+      final folderQueue = <int>[];
+
+      for (final h in rootHandles) {
+        final info = await getObjectInfo(h);
+        if (info == null) continue;
+        if (info.isFolder || info.fileName.toUpperCase() == 'DCIM') {
+          folderQueue.add(h);
+        } else {
+          allHandles.add(h);
+        }
+      }
+
+      // 2. 遍历扫描所有相册目录（重点包含星空延时 101NCZ_3, 102NCZ_3 等子文件夹）
+      while (folderQueue.isNotEmpty) {
+        final currentFolder = folderQueue.removeAt(0);
+        try {
+          final childData = await _client!.executeDataIn(
+            PtpOpCodes.getObjectHandles,
+            [storageId, 0, currentFolder],
+          );
+          final childHandles = _parseUint32Array(childData);
+
+          for (final ch in childHandles) {
+            final cInfo = await getObjectInfo(ch);
+            if (cInfo == null) continue;
+            if (cInfo.isFolder) {
+              // 发现子文件夹（例如 DCIM 下的 100NCZ_3, 101NCZ_3 延时拍摄文件夹）
+              folderQueue.add(ch);
+            } else {
+              allHandles.add(ch);
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    return allHandles;
+  }
+
+  @override
+  Future<CameraFileItem?> getObjectInfo(int handle) async {
+    if (!isConnected) return null;
+    if (_objectInfoCache.containsKey(handle)) {
+      return _objectInfoCache[handle];
+    }
+
+    try {
+      // 0x1008: GetObjectInfo
+      final data = await _client!.executeDataIn(PtpOpCodes.getObjectInfo, [handle]);
+      if (data.length < 52) return null;
+
+      final bd = ByteData.sublistView(data);
+      final storageId = bd.getUint32(0, Endian.little);
+      final format = bd.getUint16(4, Endian.little);
+      final size = bd.getUint32(8, Endian.little);
+
+      // 解析偏移 52 处的文件名
+      final reader = PtpByteReader(data.sublist(52));
+      final fileName = reader.readPtpString();
+      final captureDate = reader.readPtpString();
+
+      final item = CameraFileItem(
+        handle: handle,
+        storageId: storageId,
+        format: format,
+        size: size,
+        fileName: fileName.isEmpty ? 'DSC_$handle.JPG' : fileName,
+        captureDate: captureDate,
+      );
+      _objectInfoCache[handle] = item;
+      return item;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<Uint8List> getThumbnail(int handle) async {
+    if (!isConnected) return Uint8List(0);
+    if (_thumbCache.containsKey(handle)) {
+      return _thumbCache[handle]!;
+    }
+    try {
+      // 0x100A: GetThumb
+      final bytes = await _client!.executeDataIn(PtpOpCodes.getThumb, [handle]);
+      if (bytes.isNotEmpty) {
+        _thumbCache[handle] = bytes;
+      }
+      return bytes;
+    } catch (_) {
+      return Uint8List(0);
+    }
+  }
+
+  @override
+  Future<Uint8List> downloadPartialObject(int handle, int offset, int maxBytes) async {
+    if (!isConnected) return Uint8List(0);
+    // 0x101B: GetPartialObject (Handle, Offset, MaxBytes)
+    return await _client!.executeDataIn(PtpOpCodes.getPartialObject, [handle, offset, maxBytes]);
+  }
+
+  @override
+  Future<Uint8List> downloadFullObject(
+    int handle,
+    int totalSize, {
+    Function(int current, int total)? onProgress,
+  }) async {
+    const chunkSize = 4 * 1024 * 1024; // 4MB 分块
+    final builder = BytesBuilder();
+    var currentOffset = 0;
+
+    while (currentOffset < totalSize) {
+      final requestBytes = (totalSize - currentOffset > chunkSize) ? chunkSize : (totalSize - currentOffset);
+      Uint8List chunk = Uint8List(0);
+      int retries = 0;
+
+      // 遵循官方 GetObjectAction.java 遇超时/设备忙重试策略
+      while (retries < 3) {
+        try {
+          chunk = await downloadPartialObject(handle, currentOffset, requestBytes);
+          if (chunk.isNotEmpty) break;
+        } catch (_) {}
+        retries++;
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+
+      if (chunk.isEmpty) break;
+
+      builder.add(chunk);
+      currentOffset += chunk.length;
+      onProgress?.call(currentOffset, totalSize);
+    }
+
+    return builder.toBytes();
+  }
+
+  // ==========================================
+  // 事件处理与私有辅助函数
+  // ==========================================
+
+  void _handleCameraEvent(PtpPacket eventPacket) async {
+    // 0x4002: ObjectAdded 新文件生成事件
+    if (eventPacket.payload.length >= 6) {
+      final eventCode = eventPacket.getUint16(0);
+      if (eventCode == 0x4002) {
+        final newHandle = eventPacket.getUint32(4);
+        final fileInfo = await getObjectInfo(newHandle);
+        if (fileInfo != null) {
+          _photoCapturedController.add(fileInfo);
+        }
+      }
+    }
+  }
+
+  Future<void> _queryDeviceInfo() async {
+    final infoData = await _client!.executeDataIn(PtpOpCodes.getDeviceInfo);
+    if (infoData.isNotEmpty) {
+      _deviceInfo = NikonDeviceInfo.parse(infoData);
+      if (_deviceInfo.model.isNotEmpty && _deviceInfo.model != 'Nikon Camera') {
+        _cameraModel = _deviceInfo.model;
+      }
+      _logCallback?.call('【相机识别成功】型号: $_cameraModel, 固件: ${_deviceInfo.deviceVersion}, 序列号: ${_deviceInfo.serialNumber}');
+    }
+
+    // 备用机型探测: 若型号未能从 DeviceInfo 中解析出，尝试从厂商扩展属性 0xD1A2 读取
+    if (_cameraModel == 'Nikon Camera') {
+      try {
+        final propData = await _client!.executeDataIn(PtpOpCodes.getDevicePropValue, [0xD1A2]);
+        if (propData.length > 1) {
+          final s = PtpByteReader(propData).readPtpString().trim();
+          if (s.isNotEmpty) {
+            _cameraModel = NikonDeviceInfo.normalizeModelName(s);
+            _logCallback?.call('【从属性 0xD1A2 读取机型成功】: $_cameraModel');
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 查询物理卡槽并更新单/双卡槽配置
+    try {
+      await listStorageIds();
+      _logCallback?.call('【卡槽检索完成】识别到 ${_detectedStorageIds.length} 个存储卷，单卡槽机型判定: $isSingleSlotCamera');
+    } catch (_) {}
+  }
+
+  Future<void> _queryBatteryLevel() async {
+    try {
+      // 0x5001: BatteryLevel (Device Property)
+      final propData = await _client!.executeDataIn(PtpOpCodes.getDevicePropValue, [0x5001]);
+      if (propData.isNotEmpty) {
+        _batteryLevel = propData[0].clamp(0, 100);
+      }
+    } catch (_) {}
+  }
+
+  List<int> _parseUint32Array(Uint8List data) {
+    if (data.length < 4) return [];
+    final reader = PtpByteReader(data);
+    final count = reader.readUint32();
+    if (count <= 0 || count > 100000) return [];
+    final list = <int>[];
+    for (var i = 0; i < count; i++) {
+      if (reader.remaining < 4) break;
+      list.add(reader.readUint32());
+    }
+    return list;
+  }
+
+  void dispose() {
+    disconnect();
+    _photoCapturedController.close();
+    _stateController.close();
+  }
+}
