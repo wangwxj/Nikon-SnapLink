@@ -252,5 +252,25 @@ class CameraNativeBridge {
       return null;
     }
   }
+
+  /// 调起 Android 原生包安装器安装指定的本地 APK 文件
+  static Future<bool> installApk(String filePath) async {
+    try {
+      final res = await _channel.invokeMethod<bool>('installApk', {'filePath': filePath});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 唤起系统默认外部浏览器打开指定 URL
+  static Future<bool> openUrlInBrowser(String url) async {
+    try {
+      final res = await _channel.invokeMethod<bool>('openUrlInBrowser', {'url': url});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 }
 

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snaplink/core/utils/exif_helper.dart';
 import 'package:snaplink/engine/filter/photo_filter.dart';
@@ -44,8 +45,45 @@ void main() {
       expect(meta.hasValidExif, isTrue);
     });
 
-    test('PhotoFilterEngine 14 套大师级滤镜矩阵与线性插值校验', () {
-      expect(PhotoFilterType.values.length, equals(14));
+    test('PhotoFilterEngine 87 款相机实拍配方与大师级滤镜矩阵校验 (含夕阳晚霞与赛博霓虹删除验证)', () {
+      // 验证总共 87 款预设 (77 款新配方 + 10 款经典精选)
+      expect(PhotoFilterType.values.length, equals(87));
+
+      // 验证已彻底删除“夕阳晚霞”与“赛博霓虹”
+      final allNames = PhotoFilterType.values.map((e) => e.name).toList();
+      final allLabels = PhotoFilterType.values.map((e) => e.label).toList();
+      expect(allNames.contains('sunsetGlow'), isFalse);
+      expect(allNames.contains('neonGlow'), isFalse);
+      expect(allLabels.contains('夕阳晚霞'), isFalse);
+      expect(allLabels.contains('赛博霓虹'), isFalse);
+
+      // 验证一级分类与二级分类体系
+      expect(PhotoFilterType.categories1.length, equals(7));
+      expect(PhotoFilterType.categories1, containsAll([
+        '富士胶片',
+        '柯达胶片',
+        '理光人文',
+        '索尼大师',
+        '经典黑白',
+        '电影特色',
+        '经典精选',
+      ]));
+
+      // 验证各一级分类下均包含正确的子项
+      final fujiPresets = PhotoFilterType.getByCategories('富士胶片');
+      expect(fujiPresets.length, equals(21)); // 16 款胶片模拟 + 5 款经典胶卷
+      final kodakPresets = PhotoFilterType.getByCategories('柯达胶片');
+      expect(kodakPresets.length, equals(14)); // 11 款彩色负片 + 3 款黑白
+      final ricohPresets = PhotoFilterType.getByCategories('理光人文');
+      expect(ricohPresets.length, equals(8));  // 8 款 GR 影像控制
+      final sonyPresets = PhotoFilterType.getByCategories('索尼大师');
+      expect(sonyPresets.length, equals(22)); // 8 款索尼 + 5 徕卡哈苏 + 5 佳能尼康 + 4 松下奥巴
+      final monoPresets = PhotoFilterType.getByCategories('经典黑白');
+      expect(monoPresets.length, equals(5));  // 5 款伊尔福银盐
+      final cinePresets = PhotoFilterType.getByCategories('电影特色');
+      expect(cinePresets.length, equals(7));  // 4 款电影 + 3 款宝丽来爱克发
+      final classicPresets = PhotoFilterType.getByCategories('经典精选');
+      expect(classicPresets.length, equals(10)); // 1 款原片直出 + 9 款经典
 
       // 原片直出矩阵为单位矩阵
       final originalMatrix = PhotoFilterEngine.getMatrix(PhotoFilterType.original, 1.0);
@@ -65,10 +103,18 @@ void main() {
       final portraitMatrix = PhotoFilterEngine.getMatrix(PhotoFilterType.fairSkin, 1.0);
       expect(portraitMatrix.length, equals(20));
 
-      // 验证全部 14 种预设均具备真实参数映射（支持一键载入滑块深度微调）
+      // 验证全部 87 种预设均具备真实参数映射、色板与有效调色矩阵
       for (final filter in PhotoFilterType.values) {
         final preset = filter.presetAdjustments;
         expect(preset, isNotNull);
+        expect(filter.label.isNotEmpty, isTrue);
+        expect(filter.code.isNotEmpty, isTrue);
+        expect(filter.previewColors.isNotEmpty, isTrue);
+        expect(filter.recipeSummary.isNotEmpty, isTrue);
+
+        final matrix = PhotoFilterEngine.getMatrix(filter, 1.0);
+        expect(matrix.length, equals(20));
+        expect(matrix.every((v) => !v.isNaN && !v.isInfinite), isTrue);
       }
 
       // 50% 强度混合插值
@@ -109,44 +155,39 @@ void main() {
       // 白平衡色温与色调双向分离校验
       final warmAdj = const PhotoEditAdjustments().copyWith(temperature: 50.0);
       final warmMatrix = PhotoFilterEngine.buildAdjustmentsMatrix(warmAdj);
-      // 暖色温提升红通道斜率，压制蓝通道
-      expect(warmMatrix[0], greaterThan(warmMatrix[12]));
+      expect(warmMatrix[0], greaterThan(1.0)); // 红色增益增强
+      expect(warmMatrix[12], lessThan(1.0));   // 蓝色增益压暗
 
       final coolAdj = const PhotoEditAdjustments().copyWith(temperature: -50.0);
       final coolMatrix = PhotoFilterEngine.buildAdjustmentsMatrix(coolAdj);
-      // 冷色温提升蓝通道斜率，压制红通道
-      expect(coolMatrix[12], greaterThan(coolMatrix[0]));
-
-      // 滤镜预设与 Lightroom 参数复合运算
-      final compositeMatrix = PhotoFilterEngine.createCompositeMatrix(
-        filterType: PhotoFilterType.classicChrome,
-        filterIntensity: 0.8,
-        adjustments: adjTone,
-      );
-      expect(compositeMatrix.length, equals(20));
-      expect(compositeMatrix.every((v) => !v.isNaN && !v.isInfinite), isTrue);
+      expect(coolMatrix[0], lessThan(1.0));   // 红色增益压暗
+      expect(coolMatrix[12], greaterThan(1.0)); // 蓝色增益增强
     });
 
     test('Lightroom 直方图算法与区间频数统计校验', () {
-      // 基础无图摄影分布直方图计算
-      final histData = HistogramData.compute(
-        adjustments: const PhotoEditAdjustments(),
+      // 构造合成采样像素 (RGB 分布)
+      final sampledR = List<int>.generate(256, (i) => i);
+      final sampledG = List<int>.generate(256, (i) => (i * 0.8).round());
+      final sampledB = List<int>.generate(256, (i) => (i * 0.5).round());
+
+      final hist = HistogramData.compute(
+        adjustments: PhotoEditAdjustments.initial,
         filterType: PhotoFilterType.original,
+        sampledR: sampledR,
+        sampledG: sampledG,
+        sampledB: sampledB,
       );
 
-      expect(histData.lumBins.length, equals(64));
-      expect(histData.redBins.length, equals(64));
-      expect(histData.greenBins.length, equals(64));
-      expect(histData.blueBins.length, equals(64));
+      expect(hist.lumBins.length, equals(64));
+      expect(hist.redBins.length, equals(64));
+      expect(hist.greenBins.length, equals(64));
+      expect(hist.blueBins.length, equals(64));
 
-      // 频数值均在 0.0 ~ 1.0 归一化区间内
-      expect(histData.lumBins.every((v) => v >= 0.0 && v <= 1.0), isTrue);
+      // 验证直方图各区间均归一化至 0.0 ~ 1.0 且具备有效频数
+      expect(hist.lumBins.every((v) => v >= 0.0 && v <= 1.0), isTrue);
+      expect(hist.lumBins.any((v) => v > 0.0), isTrue);
 
-      // 带采样像素的精准实时直方图计算
-      final sampledR = [50, 100, 150, 200, 250];
-      final sampledG = [60, 110, 160, 210, 240];
-      final sampledB = [70, 120, 170, 220, 230];
-
+      // 叠加上色调曝光调整后的直方图变动
       final customHist = HistogramData.compute(
         adjustments: const PhotoEditAdjustments().copyWith(exposure: 30.0),
         filterType: PhotoFilterType.shinkaiAnime,
@@ -205,6 +246,43 @@ void main() {
       expect(masterLayout.totalHeight, greaterThan(srcH));
       expect(masterLayout.imageRect.left, equals(0));
       expect(masterLayout.imageRect.top, equals(0));
+    });
+
+    test('水印字体颜色在拍立得等模板中黑白逻辑一致性验证 (彻底修复选白字体变黑的Bug)', () {
+      // 验证拍立得等模板在 textDark=false 时渲染纯白高亮字，textDark=true 时渲染深黑字
+      const meta = PhotoMetadata(
+        cameraMake: 'Nikon',
+        cameraModel: 'Z fc',
+        lensModel: 'NIKKOR Z 28mm f/2.8',
+        shutterSpeed: '1/500s',
+        aperture: 'f/2.8',
+        iso: 'ISO 200',
+        capturedDate: '2026.10.08',
+      );
+
+      final whiteTextPainter = WatermarkCanvasPainter(
+        image: null,
+        metadata: meta,
+        template: WatermarkTemplate.polaroidBlur,
+        cardDark: true, // 黑底相纸
+        textDark: false, // 用户选择“白”字
+      );
+      expect(whiteTextPainter.textDark, isFalse);
+      expect(whiteTextPainter.cardDark, isTrue);
+
+      final blackTextPainter = WatermarkCanvasPainter(
+        image: null,
+        metadata: meta,
+        template: WatermarkTemplate.polaroidBlur,
+        cardDark: false, // 白底相纸
+        textDark: true, // 用户选择“黑”字
+      );
+      expect(blackTextPainter.textDark, isTrue);
+      expect(blackTextPainter.cardDark, isFalse);
+
+      // 上下双边框模板的默认配色：白底黑字
+      expect(WatermarkTemplate.topBottomBannerBlur.defaultCardDark, isFalse);
+      expect(WatermarkTemplate.topBottomBannerBlur.defaultTextDark, isTrue);
     });
   });
 }

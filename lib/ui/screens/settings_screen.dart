@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/network_config.dart';
 import '../../core/utils/app_log_manager.dart';
+import '../../engine/update/app_update_manager.dart';
+import '../../protocol/camera_native_bridge.dart';
 import '../widgets/vant_widgets.dart';
 
 /// 系统偏好与设置页面 (Settings Screen)
@@ -409,7 +411,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               const VantCell(
                 title: '应用版本',
-                value: 'v1.0.0 (Build 2026.10)',
+                value: 'v1.1.0 (Build 2026.10)',
+              ),
+              VantCell(
+                title: '检查新版本',
+                value: '在线检测 (Gitee / GitHub)',
+                isLink: true,
+                onTap: () {
+                  AppUpdateManager.checkManually(context);
+                },
               ),
               const VantCell(
                 title: '驱动架构',
@@ -421,9 +431,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               VantCell(
                 title: '开源与许可',
-                value: 'MIT License',
+                value: 'Gitee / MIT License',
                 isLink: true,
-                onTap: () {},
+                onTap: () {
+                  CameraNativeBridge.openUrlInBrowser('https://gitee.com/lyb82ndkkkl/Nikon-SnapLink');
+                },
               ),
             ],
           ),

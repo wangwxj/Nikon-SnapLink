@@ -53,6 +53,10 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
   String _fontChoice = 'default';
   bool _isExporting = false;
 
+  // 胶片预设一二级分类状态
+  String _selectedCat1 = '富士胶片';
+  String? _selectedCat2;
+
   /// 当前选择的水印字体族 (null = 各文字保持模板原生字体)
   String? get _watermarkFontFamily {
     switch (_fontChoice) {
@@ -637,73 +641,261 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
     );
   }
 
-  /// 构建水印模板选择面板
+  /// 构建水印模板排版结构线框缩略示意
+  Widget _buildTemplateSchematic(WatermarkTemplate t, bool isSelected) {
+    final accent = isSelected ? SnapColors.primary : Colors.white60;
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: const Color(0xFF14161D),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isSelected ? SnapColors.primary.withAlpha(140) : SnapColors.border,
+          width: 0.8,
+        ),
+      ),
+      child: Center(
+        child: _getTemplateWireframe(t, accent),
+      ),
+    );
+  }
+
+  Widget _getTemplateWireframe(WatermarkTemplate t, Color accent) {
+    switch (t) {
+      case WatermarkTemplate.none:
+        return Icon(Icons.crop_free, size: 20, color: accent);
+      case WatermarkTemplate.inPhotoOverlay:
+        return Container(
+          margin: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: const Color(0xFF232733),
+            borderRadius: BorderRadius.circular(2),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(2.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(width: 7, height: 2, color: accent),
+                    Container(width: 9, height: 2, color: accent.withAlpha(180)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      case WatermarkTemplate.bottomBannerBlur:
+        return Container(
+          margin: const EdgeInsets.all(2),
+          child: Column(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF282D3C),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(2)),
+                  ),
+                ),
+              ),
+              Container(
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(2)),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Row(
+                  children: [
+                    Container(width: 3, height: 3, color: const Color(0xFFFFD100)),
+                    const SizedBox(width: 2),
+                    Container(width: 8, height: 2, color: Colors.black),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      case WatermarkTemplate.topBottomBannerBlur:
+        return Container(
+          margin: const EdgeInsets.all(2),
+          child: Column(
+            children: [
+              Container(height: 5, color: Colors.white),
+              Expanded(child: Container(color: const Color(0xFF282D3C))),
+              Container(
+                height: 7,
+                color: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Row(
+                  children: [
+                    Container(width: 8, height: 2, color: Colors.black),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      case WatermarkTemplate.darkGlassBlur:
+        return Container(
+          margin: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1B1E28),
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: Colors.white30, width: 0.6),
+          ),
+          child: Column(
+            children: [
+              Expanded(child: Container(color: const Color(0xFF12141C))),
+              Container(
+                height: 7,
+                color: const Color(0xDE13151B),
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Row(
+                  children: [
+                    Container(width: 3, height: 3, color: const Color(0xFFFFD100)),
+                    const SizedBox(width: 2),
+                    Container(width: 7, height: 1.5, color: Colors.white),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      case WatermarkTemplate.polaroidBlur:
+        return Container(
+          margin: const EdgeInsets.all(2),
+          padding: const EdgeInsets.fromLTRB(2, 2, 2, 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFAF9F6),
+            borderRadius: BorderRadius.circular(2),
+          ),
+          child: Container(color: const Color(0xFF2C303E)),
+        );
+      case WatermarkTemplate.flushMasterBar:
+        return Container(
+          margin: const EdgeInsets.all(2),
+          child: Column(
+            children: [
+              Expanded(child: Container(color: const Color(0xFF282D3C))),
+              Container(
+                height: 8,
+                color: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 3,
+                      height: 3,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFD100),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Container(width: 8, height: 2, color: Colors.white),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+    }
+  }
+
+  /// 构建单个水印模板卡片
+  Widget _buildTemplateCard(WatermarkTemplate t) {
+    final isSelected = t == _selectedTemplate;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() {
+          _selectedTemplate = t;
+          _cardDark = t.defaultCardDark;
+          _textDark = t.defaultTextDark;
+        }),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isSelected ? SnapColors.primary.withAlpha(30) : SnapColors.card,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? SnapColors.primary : SnapColors.border,
+              width: isSelected ? 1.5 : 0.8,
+            ),
+          ),
+          child: Row(
+            children: [
+              _buildTemplateSchematic(t, isSelected),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            t.label,
+                            style: TextStyle(
+                              color: isSelected ? SnapColors.primary : SnapColors.textPrimary,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                              fontSize: 11.5,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(Icons.check_circle, size: 13, color: SnapColors.primary),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      t.description,
+                      style: const TextStyle(color: SnapColors.textTertiary, fontSize: 9),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 构建水印模板选择面板 (视觉网格化排版卡片 + 结构缩略图)
   Widget _buildTemplateSelectorPanel() {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       children: [
-        // 模板卡片横向滚动
-        SizedBox(
-          height: 72,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: WatermarkTemplate.values.length,
-            itemBuilder: (context, index) {
-              final t = WatermarkTemplate.values[index];
-              final isSelected = t == _selectedTemplate;
-
-              return Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: InkWell(
-                  onTap: () => setState(() {
-                    _selectedTemplate = t;
-                    // 切换模板时恢复该模板的默认黑白配色
-                    _cardDark = t.defaultCardDark;
-                    _textDark = t.defaultTextDark;
-                  }),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: 135,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? SnapColors.primary.withAlpha(30) : SnapColors.card,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isSelected ? SnapColors.primary : SnapColors.border,
-                        width: isSelected ? 1.5 : 0.8,
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          t.label,
-                          style: TextStyle(
-                            color: isSelected ? SnapColors.primary : SnapColors.textPrimary,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            fontSize: 12,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          t.description,
-                          style: const TextStyle(color: SnapColors.textTertiary, fontSize: 9),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
+        // 模板双列视觉网格
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: WatermarkTemplate.values.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 2.1,
           ),
+          itemBuilder: (context, index) {
+            final t = WatermarkTemplate.values[index];
+            return _buildTemplateCard(t);
+          },
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         if (_selectedTemplate == WatermarkTemplate.none)
           Container(
@@ -1287,64 +1479,223 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
     );
   }
 
-  /// 胶片预设控制组 (14 款大师级预设 + 浓度 + 一键载入滑块)
+  Widget _buildSubCategoryPill({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? SnapColors.primary.withAlpha(40) : SnapColors.card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? SnapColors.primary : SnapColors.border,
+            width: isSelected ? 1.2 : 0.6,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: isSelected ? SnapColors.primary : SnapColors.textSecondary,
+              fontSize: 11,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPresetCard(PhotoFilterType filter) {
+    final isSelected = filter == _selectedFilter;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _selectedFilter = filter),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? SnapColors.primary.withAlpha(35) : SnapColors.card,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? SnapColors.primary : SnapColors.border,
+              width: isSelected ? 1.5 : 0.8,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // 顶行: 色板条 + 英文代码
+              Row(
+                children: [
+                  Row(
+                    children: filter.previewColors.take(3).map((c) => Container(
+                      width: 7,
+                      height: 7,
+                      margin: const EdgeInsets.only(right: 3),
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                      ),
+                    )).toList(),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      filter.code,
+                      style: const TextStyle(
+                        color: SnapColors.textTertiary,
+                        fontSize: 9.5,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (isSelected)
+                    const Icon(Icons.check_circle, size: 13, color: SnapColors.primary),
+                ],
+              ),
+              const SizedBox(height: 3),
+              // 中行: 中文名称
+              Text(
+                filter.label,
+                style: TextStyle(
+                  color: isSelected ? SnapColors.primary : SnapColors.textPrimary,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  fontSize: 12.5,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              // 底行: 核心配方参数摘要
+              Text(
+                filter.recipeSummary,
+                style: TextStyle(
+                  color: isSelected ? SnapColors.primary.withAlpha(210) : SnapColors.textTertiary,
+                  fontSize: 9,
+                  height: 1.1,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 胶片预设控制组 (一二级分类导航 + 双列视觉网格卡片 + 浓度滑块 + 一键载入)
   Widget _buildFilmPresetsGroup() {
+    final cats2 = PhotoFilterType.getCategories2(_selectedCat1);
+    final displayedFilters = PhotoFilterType.getByCategories(_selectedCat1, _selectedCat2);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 1. 一级分类水平标签栏
         SizedBox(
-          height: 72,
-          child: ListView.builder(
+          height: 36,
+          child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: PhotoFilterType.values.length,
+            itemCount: PhotoFilterType.categories1.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
-              final filter = PhotoFilterType.values[index];
-              final isSelected = filter == _selectedFilter;
-
-              return Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: InkWell(
-                  onTap: () => setState(() => _selectedFilter = filter),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: 110,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? SnapColors.primary.withAlpha(30) : SnapColors.card,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isSelected ? SnapColors.primary : SnapColors.border,
-                        width: isSelected ? 1.5 : 0.8,
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          filter.label,
-                          style: TextStyle(
-                            color: isSelected ? SnapColors.primary : SnapColors.textPrimary,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          filter.code,
-                          style: const TextStyle(color: SnapColors.textTertiary, fontSize: 9, fontFamily: 'monospace'),
-                        ),
-                      ],
-                    ),
-                  ),
+              final cat1 = PhotoFilterType.categories1[index];
+              final isSelected = cat1 == _selectedCat1;
+              return ChoiceChip(
+                label: Text(cat1),
+                selected: isSelected,
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _selectedCat1 = cat1;
+                      _selectedCat2 = null; // 重置二级分类为“全部”
+                    });
+                  }
+                },
+                selectedColor: SnapColors.primary,
+                backgroundColor: SnapColors.card,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.black : Colors.white70,
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
+                side: BorderSide(
+                  color: isSelected ? SnapColors.primary : SnapColors.border,
+                  width: 0.8,
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                showCheckmark: false,
               );
             },
           ),
         ),
 
+        const SizedBox(height: 8),
+
+        // 2. 二级分类水平胶囊药丸栏
+        if (cats2.length > 1) ...[
+          SizedBox(
+            height: 28,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                _buildSubCategoryPill(
+                  title: '全部 (${PhotoFilterType.getByCategories(_selectedCat1).length})',
+                  isSelected: _selectedCat2 == null,
+                  onTap: () => setState(() => _selectedCat2 = null),
+                ),
+                const SizedBox(width: 6),
+                ...cats2.map((c2) {
+                  final count = PhotoFilterType.getByCategories(_selectedCat1, c2).length;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: _buildSubCategoryPill(
+                      title: '$c2 ($count)',
+                      isSelected: _selectedCat2 == c2,
+                      onTap: () => setState(() => _selectedCat2 = c2),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+        ] else
+          const SizedBox(height: 4),
+
+        // 3. 双列预设卡片网格
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: displayedFilters.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 2.1,
+          ),
+          itemBuilder: (context, index) {
+            final filter = displayedFilters[index];
+            return _buildPresetCard(filter);
+          },
+        ),
+
         const SizedBox(height: 12),
 
+        // 4. 当前选中预设详细参数提示卡片
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
@@ -1352,15 +1703,33 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: SnapColors.border),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.auto_awesome, size: 14, color: SnapColors.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  _selectedFilter.description,
-                  style: const TextStyle(color: SnapColors.textSecondary, fontSize: 11),
-                ),
+              Row(
+                children: [
+                  const Icon(Icons.auto_awesome, size: 14, color: SnapColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '【${_selectedFilter.label}】${_selectedFilter.description}',
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(Icons.tune, size: 12, color: SnapColors.textTertiary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '机内配方: ${_selectedFilter.recipeSummary}',
+                      style: const TextStyle(color: SnapColors.textSecondary, fontSize: 10, fontFamily: 'monospace'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1368,9 +1737,10 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
 
         const SizedBox(height: 12),
 
+        // 5. 预设浓度滑块
         Row(
           children: [
-            const Text('胶片预设浓度', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
+            const Text('预设浓度', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
             Expanded(
               child: Slider(
                 value: _filterIntensity,
@@ -1392,6 +1762,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
           ],
         ),
 
+        // 6. 载入参数至滑块按钮
         if (_selectedFilter != PhotoFilterType.original) ...[
           const SizedBox(height: 8),
           OutlinedButton.icon(

@@ -876,10 +876,10 @@ class WatermarkCanvasPainter extends CustomPainter {
   void _drawPolaroidBlur(Canvas canvas, Size size, ui.Image? img, Rect imgRect) {
     final scale = size.width / 1200.0;
     final cardFill = cardDark ? const Color(0xFF17181C) : const Color(0xFFFAF9F6);
-    final strongText = textDark ? const Color(0xFFF0F0F0) : const Color(0xFF2B2B2B);
-    final mutedText = textDark ? const Color(0xFFAAAAAA) : const Color(0xFF7A7A7A);
-    final expoText = textDark ? const Color(0xFFEDEDED) : const Color(0xFF333333);
-    final photoStroke = textDark ? const Color(0x0FFFFFFF) : const Color(0x0F000000);
+    final strongText = textDark ? const Color(0xFF2B2B2B) : const Color(0xFFF0F0F0);
+    final mutedText = textDark ? const Color(0xFF7A7A7A) : const Color(0xFFAAAAAA);
+    final expoText = textDark ? const Color(0xFF333333) : const Color(0xFFEDEDED);
+    final photoStroke = cardDark ? const Color(0x18FFFFFF) : const Color(0x0F000000);
     final pad = imgRect.width * 0.032 * spacingScale;
     final bottomH = imgRect.height * 0.16 * spacingScale;
     final cardRect = Rect.fromLTRB(imgRect.left - pad, imgRect.top - pad, imgRect.right + pad, imgRect.bottom + bottomH);

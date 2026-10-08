@@ -37,6 +37,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.InetAddress
+import androidx.core.content.FileProvider
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.nikon.snaplink/native_camera"
@@ -185,6 +186,56 @@ class MainActivity: FlutterActivity() {
                         } else {
                             val saved = saveImageToPublicPictures(file)
                             result.success(saved)
+                        }
+                    }
+                }
+                "installApk" -> {
+                    val filePath = call.argument<String>("filePath")
+                    if (filePath.isNullOrBlank()) {
+                        result.error("INVALID_PATH", "Path is empty", null)
+                    } else {
+                        try {
+                            val file = File(filePath)
+                            if (!file.exists()) {
+                                result.error("NOT_FOUND", "File does not exist", null)
+                            } else {
+                                val apkUri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                    FileProvider.getUriForFile(
+                                        this,
+                                        "${applicationContext.packageName}.fileprovider",
+                                        file
+                                    )
+                                } else {
+                                    Uri.fromFile(file)
+                                }
+
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(apkUri, "application/vnd.android.package-archive")
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                startActivity(intent)
+                                result.success(true)
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to start APK installation", e)
+                            result.error("INSTALL_ERROR", e.localizedMessage, null)
+                        }
+                    }
+                }
+                "openUrlInBrowser" -> {
+                    val url = call.argument<String>("url")
+                    if (url.isNullOrBlank()) {
+                        result.error("INVALID_URL", "URL is empty", null)
+                    } else {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("BROWSER_ERROR", e.localizedMessage, null)
                         }
                     }
                 }

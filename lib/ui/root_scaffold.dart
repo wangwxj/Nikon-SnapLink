@@ -5,6 +5,7 @@ import '../../core/utils/exif_helper.dart';
 import '../../engine/liveview/liveview_controller.dart';
 import '../../engine/transfer/download_manager.dart';
 import '../../engine/transfer/shoot_and_transfer.dart';
+import '../../engine/update/app_update_manager.dart';
 import '../../protocol/nikon_driver.dart';
 import 'screens/connect_screen.dart';
 import 'screens/gallery_screen.dart';
@@ -40,6 +41,13 @@ class _RootScaffoldState extends State<RootScaffold> {
       driver: _driver,
       downloadManager: _downloadManager,
     );
+
+    // 应用启动静默检测是否有远程新版本 (优先 Gitee 源)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppUpdateManager.checkOnStartup(context);
+      }
+    });
   }
 
   @override
