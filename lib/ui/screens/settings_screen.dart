@@ -417,9 +417,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           VantCellGroup(
             title: '关于 SnapLink',
             children: [
-              const VantCell(
+              VantCell(
                 title: '应用版本',
-                value: 'v1.1.0 (Build 2026.10)',
+                value: 'v${AppUpdateManager.currentVersion} (Build ${AppUpdateManager.currentVersionCode})',
               ),
               VantCell(
                 title: '检查新版本',
@@ -431,7 +431,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const VantCell(
                 title: '驱动架构',
-                value: 'Nikon PTP/IP 纯原生 Dart 协议栈',
+                value: 'Wi-Fi PTP/IP + USB PTP (Dart/Kotlin)',
               ),
               const VantCell(
                 title: 'UI 体系',

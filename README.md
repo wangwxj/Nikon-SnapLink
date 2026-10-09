@@ -19,7 +19,7 @@ SnapLink 是一款使用 Flutter 编写的开源摄影助手应用，解决的�
 
 | 页面 | 说明 |
 |------|------|
-| 连接 | Wi-Fi 直连 / 蓝牙互联 / USB 三种接入方式，附常用地址预设 |
+| 连接 | Wi-Fi 直连（PTP/IP，已验证）/ USB OTG（浏览与下载）/ 蓝牙（规划中） |
 | 监看取景 | 实时 LiveView 画面、直方图、曝光参数遥控、快门触发 |
 | 相机相册 | 浏览相机存储卡，批量下载 JPG / RAW 并归档到手机相册 |
 | 水印工坊 | 画廊卡片水印模板 + Lightroom 级直出调色，所见即所得 |
@@ -31,7 +31,7 @@ SnapLink 是一款使用 Flutter 编写的开源摄影助手应用，解决的�
 
 ### 连接
 
-加入相机释放的 Wi-Fi 热点（如 `NIKON_...`）后一键建立 PTP/IP 连接，也支持蓝牙互联与 USB 通道。
+加入相机释放的 Wi-Fi 热点（如 `NIKON_...`）后一键建立 PTP/IP 连接；亦支持 USB OTG 有线连接用于浏览存储卡与下载。蓝牙遥控（Nikon LSS）仍在开发中。
 
 <p align="center"><img src="static/连接.jpg" width="280" alt="连接页面" /></p>
 
@@ -66,7 +66,8 @@ SnapLink 是一款使用 Flutter 编写的开源摄影助手应用，解决的�
 ### 连接与协议
 
 - 纯 Dart 实现的 PTP/IP 客户端，管理 Command / Event 双 TCP 套接字与心跳保活，无需原生桥接。
-- 支持 Wi-Fi 直连（相机热点）、蓝牙互联、USB 三种连接方式，设置页内置尼康默认热点（`192.168.0.1`）与局域网 / WT 发射器（`192.168.1.1`）快捷预设。
+- 支持 Wi-Fi 直连（相机热点，PTP/IP）与 USB OTG（PTP over USB，首期支持连接、浏览与下载）两种接入方式；设置页内置尼康默认热点（`192.168.0.1`）与局域网 / WT 发射器（`192.168.1.1`）快捷预设。
+- 蓝牙（Nikon LSS）遥控规划中：官方链路加密库为闭源实现，项目正以纯 Dart 复刻，待逐字节验证通过后开放（详见 everse_analysis/BLE_LSS_RE.md）。
 - 可配置 PTP/IP 通信端口（默认 `15740`）、心跳间隔（默认 15 秒，防止相机自动休眠）、Android 进程网卡强绑定等底层网络选项。
 - 内置协议诊断模块，记录握手与通信日志，便于排查机型兼容问题。
 
@@ -109,9 +110,10 @@ snaplink/
 │   │   ├── ptp_ip_client.dart     # 双 Socket 客户端与心跳保活
 │   │   ├── camera_driver.dart     # 相机驱动抽象接口
 │   │   ├── nikon_driver.dart      # 尼康专属驱动（LiveView / 调参 / 下载）
-│   │   ├── nikon_ble_lss.dart     # 蓝牙互联
+│   │   ├── nikon_ble_lss.dart     # 蓝牙 LSS（规划中）
 │   │   ├── nikon_liveview_parser.dart  # LiveView 帧解析
-│   │   └── camera_native_bridge.dart    # 平台通道桥接（USB 等）
+│   │   ├── usb_ptp_transport.dart # USB (PTP over OTG) 传输层
+│   │   └── camera_native_bridge.dart    # 平台通道桥接（USB / 蓝牙 / 电量等）
 │   ├── engine/                    # 业务引擎
 │   │   ├── liveview/              # 拉流循环、帧率调节、监看叠加层
 │   │   ├── transfer/              # 分块下载、边拍边传、导出历史

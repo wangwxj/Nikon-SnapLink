@@ -205,16 +205,6 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
     }
   }
 
-  Future<void> _sendBleShutter(String cmd, String name) async {
-    _addLog('发送蓝牙快门指令: $name ($cmd)');
-    final ok = await CameraNativeBridge.sendBleShutterCommand(cmd);
-    if (ok) {
-      _addLog('快门指令 $name 执行成功');
-    } else {
-      _addLog('快门指令发送失败，请确认设备已配对');
-    }
-  }
-
   // ==========================================
   // UI 构建
   // ==========================================
@@ -843,7 +833,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
 
         const SizedBox(height: 14),
 
-        // 无线遥控快门 (已配对时展示)
+        // BLE 遥控快门（Nikon LSS）规划中：官方链路加密库为闭源，纯 Dart 复刻待逐字节验证
         if (_bleStatus == 'connected') ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -871,7 +861,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                           ),
                           icon: const Icon(Icons.filter_center_focus, size: 18),
                           label: const Text('半按对焦'),
-                          onPressed: () => _sendBleShutter('half_press', '半按对焦'),
+                          onPressed: null,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -885,7 +875,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                           ),
                           icon: const Icon(Icons.camera, size: 18),
                           label: const Text('全按拍照', style: TextStyle(fontWeight: FontWeight.bold)),
-                          onPressed: () => _sendBleShutter('shutter', '全按拍照'),
+                          onPressed: null,
                         ),
                       ),
                     ],
@@ -901,7 +891,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: VantButton(
-            text: _isBleScanning ? '停止扫描相机' : '开始扫描周围相机 (BLE)',
+            text: _isBleScanning ? '停止扫描' : '扫描附近蓝牙设备 (BLE)',
             icon: _isBleScanning ? Icons.stop : Icons.search,
             type: _isBleScanning ? VantButtonType.danger : VantButtonType.primary,
             isBlock: true,

@@ -32,3 +32,6 @@ ios/.symlinks/
 key.properties
 *.keystore
 *.jks
+
+# Phase D: 本地生成的 LsSec 测试向量（不提交/不分发）
+test_vectors/
