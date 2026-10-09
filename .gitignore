@@ -27,3 +27,8 @@ ios/.symlinks/
 # Misc
 *.log
 .DS_Store
+
+# Android release signing (never commit)
+key.properties
+*.keystore
+*.jks

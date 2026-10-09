@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../protocol/camera_native_bridge.dart';
@@ -241,15 +242,55 @@ class AppUpdateManager {
     }
   }
 
+  /// 尽力获取发布资产的 `.sha256` 校验值；获取失败返回 null（不阻断更新，但会提示未校验）。
+  static Future<String?> fetchExpectedSha256(String downloadUrl,
+      {Duration timeout = const Duration(seconds: 5)}) async {
+    if (downloadUrl.isEmpty) return null;
+    final client = HttpClient()..connectionTimeout = timeout;
+    try {
+      final req = await client.getUrl(Uri.parse('$downloadUrl.sha256')).timeout(timeout);
+      req.headers.set('User-Agent', 'SnapLink-Android/1.1.0');
+      final resp = await req.close().timeout(timeout);
+      if (resp.statusCode != 200) return null;
+      final body = await resp.transform(utf8.decoder).join();
+      final hash = parseSha256(body);
+      return hash.isEmpty ? null : hash;
+    } catch (_) {
+      return null;
+    } finally {
+      client.close();
+    }
+  }
+
   // ==================== APK 下载引擎 ====================
 
-  /// 下载 APK 安装包并实时汇报进度
+  /// 计算本地文件的 SHA-256（十六进制小写）。
+  static Future<String> computeSha256(String filePath) async {
+    final digest = await sha256.bind(File(filePath).openRead()).first;
+    return digest.toString();
+  }
+
+  /// 解析发布资产中的 `.sha256` 文本，支持
+  /// "hash"、"hash  filename"、"hash *filename" 三种常见格式。
+  static String parseSha256(String content) {
+    final line = content.trim().split(RegExp(r'\r?\n')).firstWhere(
+          (l) => l.trim().isNotEmpty,
+          orElse: () => '',
+        );
+    final match = RegExp(r'[A-Fa-f0-9]{64}').firstMatch(line);
+    return match?.group(0)?.toLowerCase() ?? '';
+  }
+
+  /// 下载 APK 安装包并实时汇报进度。
+  ///
+  /// [expectedSha256] 非空时做完整性校验，不一致则返回 null 且不落盘。
   static Future<String?> downloadApk({
     required String downloadUrl,
     required String versionName,
     required void Function(int received, int total, double progress, String speedStr) onProgress,
     void Function(String error)? onError,
     CancelToken? cancelToken,
+    String? expectedSha256,
   }) async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 20);
     try {
@@ -303,6 +344,17 @@ class AppUpdateManager {
 
       await sink.flush();
       await sink.close();
+
+      // 完整性校验：不匹配即删除并拒绝安装
+      if (expectedSha256 != null && expectedSha256.isNotEmpty) {
+        final actual = await computeSha256(savePath);
+        if (actual != expectedSha256.toLowerCase()) {
+          if (await file.exists()) await file.delete();
+          onError?.call('安装包 SHA-256 校验失败，已拒绝安装');
+          return null;
+        }
+      }
+
       return savePath;
     } catch (e) {
       onError?.call('下载失败: $e');
@@ -531,10 +583,15 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
       _cancelToken = CancelToken();
     });
 
+    // 尽力获取官方校验值；拿不到则不阻断下载（仅保持原有行为）
+    final expectedSha256 =
+        await AppUpdateManager.fetchExpectedSha256(widget.releaseInfo.downloadUrl);
+
     final path = await AppUpdateManager.downloadApk(
       downloadUrl: widget.releaseInfo.downloadUrl,
       versionName: widget.releaseInfo.versionName,
       cancelToken: _cancelToken,
+      expectedSha256: expectedSha256,
       onProgress: (received, total, progress, speed) {
         if (!mounted) return;
         setState(() {
