@@ -147,6 +147,22 @@ flutter build apk --release
 # 产物：build/app/outputs/flutter-apk/app-release.apk
 ```
 
+### Release 签名配置
+
+默认情况下会回退到 debug 签名（仅供本地调试）。正式发布前请生成自己的 keystore：
+
+```bash
+keytool -genkey -v -keystore android/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+cp android/key.properties.example android/key.properties   # 再填入真实密码与路径
+```
+
+`android/key.properties` 与 `*.jks` 已被 `.gitignore` 忽略，切勿提交。
+
+### 应用内更新校验
+
+发布新版本时，请一并上传 `SnapLink-release-<版本号>.apk.sha256`（内容为 APK 的 SHA-256）。
+应用内更新会读取该文件并在安装前校验安装包完整性，校验失败将拒绝安装。
+
 运行单元测试：
 
 ```bash
@@ -172,3 +188,7 @@ flutter test
 ## 开源许可
 
 本项目采用 [MIT License](LICENSE) 开源，欢迎提交 Issue 与 Pull Request。
+> [!NOTE]
+> Windows 下若项目位于含中文等非 ASCII 字符的路径，`flutter build apk --release` 的 AOT
+> `gen_snapshot` 步骤可能因路径编码问题失败（`Unable to read file: ...app.dill`）。
+> 这是工具链限制，与本项目代码无关；请将项目放在纯 ASCII 路径（如 `D:\projects\snaplink`）后构建。
