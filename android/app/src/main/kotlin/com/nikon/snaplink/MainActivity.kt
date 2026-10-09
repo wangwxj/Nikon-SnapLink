@@ -189,6 +189,25 @@ class MainActivity: FlutterActivity() {
                         }
                     }
                 }
+                "saveMediaToGallery" -> {
+                    val srcPath = call.argument<String>("srcPath")
+                    val fileName = call.argument<String>("fileName")
+                    if (srcPath.isNullOrBlank()) {
+                        result.error("INVALID_PATH", "Path is empty", null)
+                    } else {
+                        val file = File(srcPath)
+                        if (!file.exists()) {
+                            result.error("NOT_FOUND", "File does not exist", null)
+                        } else {
+                            val saved = saveMediaToPublic(file, fileName ?: file.name)
+                            if (saved != null) {
+                                result.success(saved)
+                            } else {
+                                result.error("SAVE_FAILED", "MediaStore 保存失败", null)
+                            }
+                        }
+                    }
+                }
                 "installApk" -> {
                     val filePath = call.argument<String>("filePath")
                     if (filePath.isNullOrBlank()) {
@@ -713,35 +732,80 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    private fun saveImageToPublicPictures(srcFile: File): String {
+    /** 按媒体类型选择公共集合：图片 -> Pictures/SnapLink，视频 -> Movies/SnapLink，RAW -> Downloads/SnapLink */
+    private fun resolveSaveTarget(fileName: String): Triple<Uri, String, String?> {
+        val lower = fileName.lowercase()
+        val mime = when {
+            lower.endsWith(".png") -> "image/png"
+            lower.endsWith(".nef") || lower.endsWith(".nrw") -> "image/x-nikon-nef"
+            lower.endsWith(".mp4") -> "video/mp4"
+            lower.endsWith(".mov") -> "video/quicktime"
+            else -> "image/jpeg"
+        }
+        val isVideo = lower.endsWith(".mp4") || lower.endsWith(".mov")
+        val isRaw = lower.endsWith(".nef") || lower.endsWith(".nrw")
+        return when {
+            isVideo -> Triple(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "Movies/SnapLink", mime)
+            isRaw -> Triple(MediaStore.Files.getContentUri("external"), "Downloads/SnapLink", mime)
+            else -> Triple(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "Pictures/SnapLink", mime)
+        }
+    }
+
+    private fun mimeForFileName(fileName: String): String = resolveSaveTarget(fileName).third ?: "image/jpeg"
+
+    /** 按调用方给定的文件名（可覆盖临时 .part 名）保存到公共媒体库。 */
+    private fun saveMediaToPublic(srcFile: File, fileName: String): String? {
+        return saveMediaToPublicInternal(srcFile, fileName)
+    }
+
+    /**
+     * 将应用私有文件保存进系统公共媒体库（Android 10+ 走 MediaStore，无需存储权限）。
+     * 返回公共 MediaStore Uri 字符串；失败返回 null，由调用方标记任务失败。
+     */
+    private fun saveImageToPublicPictures(srcFile: File): String? =
+        saveMediaToPublicInternal(srcFile, srcFile.name)
+
+    private fun saveMediaToPublicInternal(srcFile: File, fileName: String): String? {
+        val (collection, relativePath, mime) = resolveSaveTarget(fileName)
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
-                    put(MediaStore.Images.Media.DISPLAY_NAME, srcFile.name)
-                    put(MediaStore.Images.Media.MIME_TYPE, if (srcFile.name.endsWith(".png", true)) "image/png" else "image/jpeg")
-                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/SnapLink")
-                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, mime ?: "application/octet-stream")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+                    put(MediaStore.MediaColumns.IS_PENDING, 1)
                 }
-                val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                if (uri != null) {
+                val uri = contentResolver.insert(collection, values)
+                    ?: return null
+                try {
                     contentResolver.openOutputStream(uri)?.use { out ->
-                        FileInputStream(srcFile).use { input ->
-                            input.copyTo(out)
-                        }
+                        FileInputStream(srcFile).use { input -> input.copyTo(out) }
+                    } ?: run {
+                        contentResolver.delete(uri, null, null)
+                        return null
                     }
                     values.clear()
-                    values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                    values.put(MediaStore.MediaColumns.IS_PENDING, 0)
                     contentResolver.update(uri, values, null, null)
                     return uri.toString()
+                } catch (e: Exception) {
+                    contentResolver.delete(uri, null, null)
+                    throw e
                 }
             } else {
-                val targetDir = File("/storage/emulated/0/Pictures/SnapLink")
-                if (!targetDir.exists()) targetDir.mkdirs()
-                val targetFile = File(targetDir, srcFile.name)
-                FileInputStream(srcFile).use { input ->
-                    FileOutputStream(targetFile).use { output ->
-                        input.copyTo(output)
+                val targetDir = File(
+                    if (collection == MediaStore.Video.Media.EXTERNAL_CONTENT_URI) {
+                        "/storage/emulated/0/Movies/SnapLink"
+                    } else if (collection == MediaStore.Files.getContentUri("external")) {
+                        "/storage/emulated/0/Download/SnapLink"
+                    } else {
+                        "/storage/emulated/0/Pictures/SnapLink"
                     }
+                )
+                if (!targetDir.exists()) targetDir.mkdirs()
+                val targetFile = File(targetDir, fileName)
+                FileInputStream(srcFile).use { input ->
+                    FileOutputStream(targetFile).use { output -> input.copyTo(output) }
                 }
                 MediaScannerConnection.scanFile(applicationContext, arrayOf(targetFile.absolutePath), null, null)
                 return targetFile.absolutePath
@@ -749,7 +813,7 @@ class MainActivity: FlutterActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "saveImageToPublicPictures failed: ${e.message}")
         }
-        return srcFile.absolutePath
+        return null
     }
 
     override fun onDestroy() {

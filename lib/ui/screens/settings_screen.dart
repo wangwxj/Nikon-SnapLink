@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/constants/colors.dart';
-import '../../core/constants/network_config.dart';
+import '../../core/settings/app_settings.dart';
 import '../../core/utils/app_log_manager.dart';
 import '../../engine/update/app_update_manager.dart';
 import '../../protocol/camera_native_bridge.dart';
@@ -16,14 +16,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _autoKeepAlive = true;
-  bool _downloadRaw = false;
-  int _preferredFps = 8;
-  bool _powerProtectionEnabled = true;
-  int _powerThreshold = 15;
-
   void _showIpEditDialog() {
-    final controller = TextEditingController(text: NetworkConfig.cameraIp);
+    final controller = TextEditingController(text: AppSettings.instance.cameraIp);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -55,7 +49,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () {
               final newIp = controller.text.trim();
               if (newIp.isNotEmpty) {
-                setState(() => NetworkConfig.cameraIp = newIp);
+                AppSettings.instance.setCameraIp(newIp);
+                setState(() {});
               }
               Navigator.pop(ctx);
             },
@@ -67,7 +62,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showPortEditDialog() {
-    final controller = TextEditingController(text: NetworkConfig.cameraPort.toString());
+    final controller = TextEditingController(text: AppSettings.instance.cameraPort.toString());
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -100,7 +95,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () {
               final port = int.tryParse(controller.text.trim());
               if (port != null && port > 0) {
-                setState(() => NetworkConfig.cameraPort = port);
+                AppSettings.instance.setCameraPort(port);
+                setState(() {});
               }
               Navigator.pop(ctx);
             },
@@ -222,13 +218,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               VantCell(
                 title: '默认相机 IP 地址',
-                value: NetworkConfig.cameraIp,
+                value: AppSettings.instance.cameraIp,
                 isLink: true,
                 onTap: _showIpEditDialog,
               ),
               VantCell(
                 title: 'PTP/IP 通信端口',
-                value: '${NetworkConfig.cameraPort}',
+                value: '${AppSettings.instance.cameraPort}',
                 isLink: true,
                 onTap: _showPortEditDialog,
               ),
@@ -238,8 +234,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 isLink: true,
                 onTap: () {
                   setState(() {
-                    NetworkConfig.cameraIp = '192.168.0.1';
-                    NetworkConfig.cameraPort = 15740;
+                    AppSettings.instance.setCameraIp('192.168.0.1');
+                    AppSettings.instance.setCameraPort(15740);
                   });
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('已恢复尼康默认相机热点地址 (192.168.0.1:15740)')),
@@ -252,8 +248,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 isLink: true,
                 onTap: () {
                   setState(() {
-                    NetworkConfig.cameraIp = '192.168.1.1';
-                    NetworkConfig.cameraPort = 15740;
+                    AppSettings.instance.setCameraIp('192.168.1.1');
+                    AppSettings.instance.setCameraPort(15740);
                   });
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('已设置为局域网发射器地址 (192.168.1.1:15740)')),
@@ -263,9 +259,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               VantCell(
                 title: 'Android 进程网卡强绑定',
                 customValue: Switch(
-                  value: NetworkConfig.autoBindNetwork,
+                  value: AppSettings.instance.autoBindNetwork,
                   activeThumbColor: SnapColors.primary,
-                  onChanged: (val) => setState(() => NetworkConfig.autoBindNetwork = val),
+                  onChanged: (val) {
+                    AppSettings.instance.setAutoBindNetwork(val);
+                    setState(() {});
+                  },
                 ),
               ),
             ],
@@ -302,9 +301,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               VantCell(
                 title: '后台保持相机 Wi-Fi 连接',
                 customValue: Switch(
-                  value: _autoKeepAlive,
+                  value: AppSettings.instance.autoKeepAlive,
                   activeThumbColor: SnapColors.primary,
-                  onChanged: (val) => setState(() => _autoKeepAlive = val),
+                  onChanged: (val) {
+                    AppSettings.instance.setAutoKeepAlive(val);
+                    setState(() {});
+                  },
                 ),
               ),
               const VantCell(
@@ -314,9 +316,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               VantCell(
                 title: '边拍边传同步 RAW 格式',
                 customValue: Switch(
-                  value: _downloadRaw,
+                  value: AppSettings.instance.downloadRaw,
                   activeThumbColor: SnapColors.primary,
-                  onChanged: (val) => setState(() => _downloadRaw = val),
+                  onChanged: (val) {
+                    AppSettings.instance.setDownloadRaw(val);
+                    setState(() {});
+                  },
                 ),
               ),
             ],
@@ -328,12 +333,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               VantCell(
                 title: '默认取景目标帧率',
-                value: '$_preferredFps FPS',
+                value: '${AppSettings.instance.preferredFps} FPS',
                 isLink: true,
                 onTap: () {
-                  setState(() {
-                    _preferredFps = (_preferredFps == 4) ? 8 : ((_preferredFps == 8) ? 15 : 4);
-                  });
+                  final opts = AppSettings.fpsOptions;
+                  final idx = opts.indexOf(AppSettings.instance.preferredFps);
+                  AppSettings.instance.setPreferredFps(opts[(idx + 1) % opts.length]);
+                  setState(() {});
                 },
               ),
               const VantCell(
@@ -354,21 +360,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               VantCell(
                 title: '启用低电量传输保护',
                 customValue: Switch(
-                  value: _powerProtectionEnabled,
+                  value: AppSettings.instance.powerProtectionEnabled,
                   activeThumbColor: SnapColors.primary,
-                  onChanged: (val) => setState(() => _powerProtectionEnabled = val),
+                  onChanged: (val) {
+                    AppSettings.instance.setPowerProtectionEnabled(val);
+                    setState(() {});
+                  },
                 ),
               ),
               VantCell(
                 title: '电量暂停保护阈值',
-                value: '$_powerThreshold%',
+                value: '${AppSettings.instance.powerThreshold}%',
                 isLink: true,
                 onTap: () {
-                  setState(() {
-                    final thresholds = [10, 15, 20, 30];
-                    final currIdx = thresholds.indexOf(_powerThreshold);
-                    _powerThreshold = thresholds[(currIdx + 1) % thresholds.length];
-                  });
+                  final opts = AppSettings.powerThresholdOptions;
+                  final idx = opts.indexOf(AppSettings.instance.powerThreshold);
+                  AppSettings.instance.setPowerThreshold(opts[(idx + 1) % opts.length]);
+                  setState(() {});
                 },
               ),
               const VantCell(
@@ -445,3 +453,5 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+
+

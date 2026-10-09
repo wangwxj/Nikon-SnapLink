@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../../core/settings/app_settings.dart';
 import '../../protocol/camera_driver.dart';
 import 'download_manager.dart';
 
@@ -9,7 +10,6 @@ class ShootAndTransferController extends ChangeNotifier {
   final DownloadManager downloadManager;
 
   bool _isEnabled = false;
-  bool _transferRaw = false; // 是否传输 RAW 文件 (默认只传快速 JPG)
   StreamSubscription<CameraFileItem>? _subscription;
   int _transferredCount = 0;
 
@@ -19,11 +19,11 @@ class ShootAndTransferController extends ChangeNotifier {
   });
 
   bool get isEnabled => _isEnabled;
-  bool get transferRaw => _transferRaw;
+  bool get transferRaw => AppSettings.instance.downloadRaw;
   int get transferredCount => _transferredCount;
 
   set transferRaw(bool value) {
-    _transferRaw = value;
+    AppSettings.instance.setDownloadRaw(value);
     notifyListeners();
   }
 
@@ -63,7 +63,7 @@ class ShootAndTransferController extends ChangeNotifier {
     if (!_isEnabled) return;
 
     // 如果未勾选传输 RAW，且该文件为 NEF/RAW，则跳过
-    if (!_transferRaw && file.isRaw) {
+    if (!AppSettings.instance.downloadRaw && file.isRaw) {
       return;
     }
 

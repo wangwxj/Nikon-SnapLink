@@ -1242,7 +1242,9 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
             children: [
               // 底层视频/取景画面 (智能解码防崩)
               if (frame != null && frame.isNotEmpty)
-                Image.memory(
+                // RepaintBoundary 隔离高频取景帧重绘，避免每帧重建整页 HUD
+                RepaintBoundary(
+                  child: Image.memory(
                   frame,
                   fit: BoxFit.contain,
                   gaplessPlayback: true,
@@ -1263,6 +1265,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                       ),
                     );
                   },
+                ),
                 )
               else
                 Container(

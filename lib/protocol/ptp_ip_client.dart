@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import '../core/constants/ptp_opcodes.dart';
+import '../core/settings/app_settings.dart';
 import '../core/utils/byte_buffer_ext.dart';
 import 'ptp_packet.dart';
 
@@ -345,9 +346,13 @@ class PtpIpClient {
     }
   }
 
-  /// 15 秒心跳定时保活
+  /// 心跳定时保活（可由设置页关闭，默认 15 秒）
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
+    if (!AppSettings.instance.autoKeepAlive) {
+      _log('心跳保活已按设置关闭');
+      return;
+    }
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
       if (!_isConnected) {
         timer.cancel();

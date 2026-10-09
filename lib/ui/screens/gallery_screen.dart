@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/network_config.dart';
+import '../../core/utils/lru_image_cache.dart';
 import '../../core/utils/exif_helper.dart';
 import '../../engine/transfer/download_manager.dart';
 import '../../engine/transfer/export_history_manager.dart';
@@ -56,26 +57,26 @@ Future<void> _writeCameraListCache(int? storageId, List<CameraFileItem> items) a
   } catch (_) {}
 }
 
-/// 缩略图磁盘缓存文件名 (相机 DCIM 内文件名唯一)
-String _thumbCacheName(String fileName) =>
-    fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_').replaceAll(RegExp(r'_+'), '_');
+/// 缩略图磁盘缓存文件名：按 storageId_handle 唯一化，避免跨卡槽同名文件互相覆盖
+String _thumbCacheName(int storageId, int handle) => '${storageId}_$handle';
 
-Future<File> _thumbCacheFile(String fileName) async {
+Future<File> _thumbCacheFile(int storageId, int handle) async {
   final dir = Directory('${(await _galleryCacheDir()).path}/thumb');
   if (!await dir.exists()) {
     await dir.create(recursive: true);
   }
-  return File('${dir.path}/${_thumbCacheName(fileName)}');
+  return File('${dir.path}/${_thumbCacheName(storageId, handle)}');
 }
 
 /// 静默获取照片原图字节 (本地已导出 > 缓存 > 相机下载)，失败返回 null
 /// 预览界面渐进式加载使用：先出缩略图，随后升级为清晰原图
 Future<Uint8List?> fetchFullPhotoBytesSilent(
   CameraDriver driver,
-  Map<int, Uint8List> cache,
+  LruImageCache cache,
   CameraFileItem item,
 ) async {
-  final cached = cache[item.handle];
+  final cacheKey = cameraCacheKey(item.storageId, item.handle);
+  final cached = cache[cacheKey];
   if (cached != null && cached.isNotEmpty) return cached;
 
   try {
@@ -83,7 +84,7 @@ Future<Uint8List?> fetchFullPhotoBytesSilent(
     if (local != null && await local.file.exists()) {
       final bytes = await local.file.readAsBytes();
       if (bytes.isNotEmpty) {
-        cache[item.handle] = bytes;
+        cache[cacheKey] = bytes;
         return bytes;
       }
     }
@@ -93,7 +94,7 @@ Future<Uint8List?> fetchFullPhotoBytesSilent(
   try {
     final bytes = await driver.downloadFullObject(item.handle, item.size);
     if (bytes.isNotEmpty) {
-      cache[item.handle] = bytes;
+      cache[cacheKey] = bytes;
       return bytes;
     }
   } catch (_) {}
@@ -104,10 +105,11 @@ Future<Uint8List?> fetchFullPhotoBytesSilent(
 Future<Uint8List?> fetchFullPhotoBytesWithDialog(
   BuildContext context,
   CameraDriver driver,
-  Map<int, Uint8List> cache,
+  LruImageCache cache,
   CameraFileItem item,
 ) async {
-  final cached = cache[item.handle];
+  final cacheKey = cameraCacheKey(item.storageId, item.handle);
+  final cached = cache[cacheKey];
   if (cached != null && cached.isNotEmpty) return cached;
 
   try {
@@ -115,7 +117,7 @@ Future<Uint8List?> fetchFullPhotoBytesWithDialog(
     if (local != null && await local.file.exists()) {
       final bytes = await local.file.readAsBytes();
       if (bytes.isNotEmpty) {
-        cache[item.handle] = bytes;
+        cache[cacheKey] = bytes;
         return bytes;
       }
     }
@@ -211,7 +213,7 @@ Future<Uint8List?> fetchFullPhotoBytesWithDialog(
   }
 
   if (result != null && !isCanceled) {
-    cache[item.handle] = result;
+    cache[cacheKey] = result;
     return result;
   }
   return null;
@@ -291,9 +293,9 @@ class GalleryScreenState extends State<GalleryScreen> {
   List<CameraMediaGroup> _groups = [];
   final Set<String> _selectedBaseNames = {};
   bool _isSelectionMode = false;
-  final Map<int, Uint8List> _thumbCache = {};
-  final Map<int, Uint8List> _fullCache = {}; // 原图字节缓存 (预览/详情/调色共用)
-  final Map<String, Future<Uint8List>> _thumbFutures = {}; // 缩略图 in-flight 去重 (key=fileName)
+  final LruImageCache _thumbCache = LruImageCache(maxEntries: 400, maxBytes: 96 * 1024 * 1024);
+  final LruImageCache _fullCache = LruImageCache(); // 原图字节 LRU (预览/详情/调色共用)
+  final Map<String, Future<Uint8List>> _thumbFutures = {}; // 缩略图 in-flight 去重 (key=storageId_handle)
   int? _selectedStorageId; // null = 全部卡槽 (0xFFFFFFFF)
   StreamSubscription<CameraConnectionState>? _connSub;
   final ScrollController _scrollController = ScrollController();
@@ -506,21 +508,22 @@ class GalleryScreenState extends State<GalleryScreen> {
 
   /// 缩略图解析：内存 > 磁盘缓存 > 相机请求(写回磁盘)，同文件 in-flight 去重
   Future<Uint8List> _resolveThumb(CameraFileItem file) {
-    final cached = _thumbCache[file.handle];
+    final cacheKey = cameraCacheKey(file.storageId, file.handle);
+    final cached = _thumbCache[cacheKey];
     if (cached != null && cached.isNotEmpty) {
       return Future.value(cached);
     }
-    final inflight = _thumbFutures[file.fileName];
+    final inflight = _thumbFutures[cacheKey];
     if (inflight != null) return inflight;
 
     final future = () async {
       // 1. 磁盘缓存 (上次看过的缩略图秒出)
       try {
-        final disk = await _thumbCacheFile(file.fileName);
+        final disk = await _thumbCacheFile(file.storageId, file.handle);
         if (await disk.exists()) {
           final bytes = await disk.readAsBytes();
           if (bytes.isNotEmpty) {
-            _thumbCache[file.handle] = bytes;
+            _thumbCache[cacheKey] = bytes;
             return bytes;
           }
         }
@@ -529,17 +532,17 @@ class GalleryScreenState extends State<GalleryScreen> {
       // 2. 相机请求并写回磁盘
       final bytes = await widget.driver.getThumbnail(file.handle);
       if (bytes.isNotEmpty) {
-        _thumbCache[file.handle] = bytes;
+        _thumbCache[cacheKey] = bytes;
         try {
-          final disk = await _thumbCacheFile(file.fileName);
+          final disk = await _thumbCacheFile(file.storageId, file.handle);
           disk.writeAsBytes(bytes); // fire & forget
         } catch (_) {}
       }
       return bytes;
     }();
 
-    _thumbFutures[file.fileName] = future;
-    future.whenComplete(() => _thumbFutures.remove(file.fileName));
+    _thumbFutures[cacheKey] = future;
+    future.whenComplete(() => _thumbFutures.remove(cacheKey));
     return future;
   }
 
@@ -548,7 +551,7 @@ class GalleryScreenState extends State<GalleryScreen> {
     await Future.delayed(const Duration(milliseconds: 300)); // 避开首屏交互
     for (final item in items) {
       if (!mounted || !widget.driver.isConnected) return;
-      if (item.isFolder || _thumbCache.containsKey(item.handle)) continue;
+      if (item.isFolder || _thumbCache.containsKey(cameraCacheKey(item.storageId, item.handle))) continue;
       try {
         await _resolveThumb(item);
       } catch (_) {}
@@ -1732,7 +1735,8 @@ class GalleryScreenState extends State<GalleryScreen> {
 
   /// 照片详情弹窗 (高精度对齐 media_1791281187020.jpg)
   void _showPhotoDetailsModal(CameraMediaGroup group, int index) async {
-    final cachedBytes = _thumbCache[group.primaryItem.handle];
+    final primaryKey = cameraCacheKey(group.primaryItem.storageId, group.primaryItem.handle);
+    final cachedBytes = _thumbCache[primaryKey];
     PhotoMetadata meta = const PhotoMetadata();
     if (cachedBytes != null && cachedBytes.isNotEmpty) {
       meta = await ExifHelper.parseBytes(cachedBytes);
@@ -1741,7 +1745,7 @@ class GalleryScreenState extends State<GalleryScreen> {
     final cameraName = widget.driver.cameraModel.isNotEmpty ? widget.driver.cameraModel : 'Z50_2';
 
     // 原图渐进加载：先展示缩略图，后台拉取原图后自动升级画质
-    final cachedFull = _fullCache[group.primaryItem.handle];
+    final cachedFull = _fullCache[primaryKey];
     final previewState = ValueNotifier<({Uint8List? bytes, bool done})>(
       (bytes: cachedFull, done: cachedFull != null && cachedFull.isNotEmpty),
     );
@@ -1822,7 +1826,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                                 errorBuilder: (_, __, ___) => _buildFallbackIcon(group.primaryItem),
                               );
                             }
-                            final thumb = _thumbCache[group.primaryItem.handle];
+                            final thumb = _thumbCache[primaryKey];
                             if (thumb != null && thumb.isNotEmpty) {
                               return Image.memory(
                                 thumb,
@@ -2007,7 +2011,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                           if (!mounted) return;
                           widget.onOpenWatermark?.call(
                             group.primaryItem,
-                            bytes ?? _thumbCache[group.primaryItem.handle],
+                            bytes ?? _thumbCache[primaryKey],
                           );
                         },
                       ),
@@ -2066,8 +2070,9 @@ class GalleryScreenState extends State<GalleryScreen> {
   }
 
   Widget _buildThumbnailImage(CameraFileItem file) {
-    if (_thumbCache.containsKey(file.handle)) {
-      final cachedBytes = _thumbCache[file.handle]!;
+    final cacheKey = cameraCacheKey(file.storageId, file.handle);
+    if (_thumbCache.containsKey(cacheKey)) {
+      final cachedBytes = _thumbCache[cacheKey]!;
       if (cachedBytes.isNotEmpty) {
         return Image.memory(
           cachedBytes,
@@ -2123,8 +2128,8 @@ class GalleryScreenState extends State<GalleryScreen> {
 class FullScreenPhotoViewer extends StatefulWidget {
   final List<CameraMediaGroup> groups;
   final int initialIndex;
-  final Map<int, Uint8List> thumbCache;
-  final Map<int, Uint8List> fullCache;
+  final LruImageCache thumbCache;
+  final LruImageCache fullCache;
   final CameraDriver driver;
   final Function(CameraMediaGroup group)? onExportSingle;
   final Function(CameraFileItem item, Uint8List? imageBytes, {bool openFilter})? onOpenWatermark;
@@ -2183,7 +2188,7 @@ class _FullScreenPhotoViewerState extends State<FullScreenPhotoViewer> {
     Navigator.pop(context);
     widget.onOpenWatermark?.call(
       primary,
-      bytes ?? widget.thumbCache[primary.handle],
+      bytes ?? widget.thumbCache[cameraCacheKey(primary.storageId, primary.handle)],
       openFilter: true,
     );
   }
@@ -2199,7 +2204,8 @@ class _FullScreenPhotoViewerState extends State<FullScreenPhotoViewer> {
       );
     }
 
-    final full = widget.fullCache[file.handle];
+    final fullKey = cameraCacheKey(file.storageId, file.handle);
+    final full = widget.fullCache[fullKey];
     if (full != null && full.isNotEmpty) {
       return Image.memory(
         full,
@@ -2211,7 +2217,7 @@ class _FullScreenPhotoViewerState extends State<FullScreenPhotoViewer> {
 
     _ensureFullLoaded(file);
 
-    final cachedThumb = widget.thumbCache[file.handle];
+    final cachedThumb = widget.thumbCache[fullKey];
     if (cachedThumb != null && cachedThumb.isNotEmpty) {
       return Stack(
         fit: StackFit.expand,
@@ -2239,7 +2245,7 @@ class _FullScreenPhotoViewerState extends State<FullScreenPhotoViewer> {
       future: widget.driver.getThumbnail(file.handle),
       builder: (ctx, snap) {
         if (snap.hasData && snap.data!.isNotEmpty) {
-          widget.thumbCache[file.handle] = snap.data!;
+          widget.thumbCache[cameraCacheKey(file.storageId, file.handle)] = snap.data!;
           return Image.memory(snap.data!, fit: fit);
         }
         return const Center(

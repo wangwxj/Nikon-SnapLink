@@ -971,14 +971,20 @@ class NikonDriver implements CameraDriver {
         await Future.delayed(const Duration(milliseconds: 100));
       }
 
-      if (chunk.isEmpty) break;
+      if (chunk.isEmpty) {
+        throw StateError('GetPartialObject 在偏移 $currentOffset 处连续返回空数据块');
+      }
 
       builder.add(chunk);
       currentOffset += chunk.length;
       onProgress?.call(currentOffset, totalSize);
     }
 
-    return builder.toBytes();
+    final bytes = builder.toBytes();
+    if (bytes.length != totalSize) {
+      throw StateError('对象 $handle 下载不完整：${bytes.length} / $totalSize 字节');
+    }
+    return bytes;
   }
 
   // ==========================================

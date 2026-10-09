@@ -253,6 +253,20 @@ class CameraNativeBridge {
     }
   }
 
+  /// 将相机下载到的临时文件按内容类型保存到系统公共媒体库（图片/视频/RAW）。
+  /// 成功返回 MediaStore Uri（或旧系统路径），失败返回 null。
+  static Future<String?> saveMediaToGallery(String srcPath, String fileName) async {
+    try {
+      final res = await _channel.invokeMethod<String>('saveMediaToGallery', {
+        'srcPath': srcPath,
+        'fileName': fileName,
+      });
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 调起 Android 原生包安装器安装指定的本地 APK 文件
   static Future<bool> installApk(String filePath) async {
     try {

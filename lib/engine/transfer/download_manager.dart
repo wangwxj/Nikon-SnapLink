@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../core/settings/app_settings.dart';
 import '../../protocol/camera_driver.dart';
 import '../../protocol/camera_native_bridge.dart';
 import 'export_history_manager.dart';
@@ -48,8 +49,9 @@ class DownloadManager extends ChangeNotifier {
   // ----------------------------------------------------
   // SnapBridge-Enhanced 低电量保护状态机
   // ----------------------------------------------------
-  bool _powerProtectionEnabled = true;
-  int _lowPowerThreshold = 15; // 默认 15% (可选 10, 15, 20, 30)
+  // 低电量保护参数统一来自 AppSettings，避免设置页改了但传输不生效
+  bool get _powerProtectionEnabled => AppSettings.instance.powerProtectionEnabled;
+  int get _lowPowerThreshold => AppSettings.instance.powerThreshold;
   bool _isPowerPaused = false;
   bool _isManualPaused = false;
   String _powerPauseReason = '';
@@ -72,13 +74,13 @@ class DownloadManager extends ChangeNotifier {
   String get powerPauseReason => _powerPauseReason;
 
   set powerProtectionEnabled(bool val) {
-    _powerProtectionEnabled = val;
+    AppSettings.instance.setPowerProtectionEnabled(val);
     checkPowerState();
     notifyListeners();
   }
 
   set lowPowerThreshold(int val) {
-    _lowPowerThreshold = val;
+    AppSettings.instance.setPowerThreshold(val);
     checkPowerState();
     notifyListeners();
   }
@@ -218,36 +220,71 @@ class DownloadManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 获取存储目录 (优先相册 DCIM/SnapLink 或 Pictures/SnapLink)
-  Future<Directory> _getOutputDir() async {
-    // 优先尝试外部公共存储
+  /// 应用私有临时下载目录（下载/续传都写这里，成功后再交给 MediaStore 保存到公共相册）
+  Future<Directory> _getTempDir() async {
+    Directory base;
     try {
-      final publicDirs = [
-        Directory('/storage/emulated/0/DCIM/SnapLink'),
-        Directory('/storage/emulated/0/Pictures/SnapLink'),
-      ];
-      for (final dir in publicDirs) {
-        if (!await dir.exists()) {
-          await dir.create(recursive: true);
-        }
-        return dir;
-      }
-    } catch (_) {}
-
-    // 回退到应用外部文件目录或文档目录
-    try {
-      final extDir = await getExternalStorageDirectory();
-      if (extDir != null) return extDir;
-    } catch (_) {}
-
-    try {
-      return await getApplicationDocumentsDirectory();
+      base = await getExternalStorageDirectory() ??
+          await getApplicationDocumentsDirectory();
     } catch (_) {
-      return Directory.systemTemp;
+      base = Directory.systemTemp;
+    }
+    final dir = Directory('${base.path}/snaplink_downloads');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
+  Future<File> _partialFileFor(DownloadTask task) async {
+    final dir = await _getTempDir();
+    final safeName = task.fileItem.fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return File('${dir.path}/$safeName.part');
+  }
+
+  /// 分块流式下载到临时文件：失败/断开时保留已写部分，下次从 [downloadedBytes] 续传。
+  /// 长度校验在 [_downloadToFile] 内完成，任何缺口都会抛错，绝不产出残缺文件。
+  Future<void> _downloadToFile(
+    DownloadTask task,
+    File target, {
+    required Function(int current, int total) onProgress,
+  }) async {
+    const chunkSize = 4 * 1024 * 1024;
+    final sink = target.openWrite(mode: FileMode.append);
+    var received = task.downloadedBytes;
+
+    try {
+      while (received < task.totalBytes) {
+        if (!driver.isConnected || isPaused) {
+          throw StateError('传输中断（连接断开或已暂停），可稍后重试续传');
+        }
+        final requestBytes = (task.totalBytes - received > chunkSize)
+            ? chunkSize
+            : (task.totalBytes - received);
+
+        // downloadPartialObject 内部已含 3 次重试，此处负责把缺失字节补上或抛错
+        final chunk = await driver.downloadPartialObject(task.fileItem.handle, received, requestBytes);
+        if (chunk.isEmpty) {
+          throw StateError('相机在第 $received 字节处返回空数据块');
+        }
+        sink.add(chunk);
+        received += chunk.length;
+        task.downloadedBytes = received;
+        task.progress = task.totalBytes > 0 ? (received / task.totalBytes).clamp(0.0, 1.0) : 0.0;
+        onProgress(received, task.totalBytes);
+      }
+      await sink.flush();
+    } finally {
+      await sink.close();
+    }
+
+    final actual = await target.length();
+    if (actual < task.totalBytes) {
+      throw StateError('下载不完整：$actual / ${task.totalBytes} 字节');
     }
   }
 
-  /// 队列处理循环 (带有限退避重试与低电量无缝暂停保护)
+  /// 队列处理循环 (带有限退避重试、断点续传与低电量无缝暂停保护)
   Future<void> _processQueue() async {
     if (_isProcessing || !driver.isConnected) return;
     _isProcessing = true;
@@ -281,11 +318,20 @@ class DownloadManager extends ChangeNotifier {
       notifyListeners();
 
       bool success = false;
+      File? partial;
       while (pendingTask.retryCount <= 4 && !success) {
         try {
-          final bytes = await driver.downloadFullObject(
-            pendingTask.fileItem.handle,
-            pendingTask.totalBytes,
+          partial ??= await _partialFileFor(pendingTask);
+
+          // 断点续传：沿用已写入的字节数，从缺口处继续
+          final existing = await partial.exists() ? await partial.length() : 0;
+          pendingTask.downloadedBytes = existing;
+          pendingTask.progress =
+              pendingTask.totalBytes > 0 ? (existing / pendingTask.totalBytes).clamp(0.0, 1.0) : 0.0;
+
+          await _downloadToFile(
+            pendingTask,
+            partial,
             onProgress: (current, total) {
               pendingTask.downloadedBytes = current;
               pendingTask.totalBytes = total;
@@ -294,20 +340,24 @@ class DownloadManager extends ChangeNotifier {
             },
           );
 
-          // 保存文件到公共相册目录
-          final saveDir = await _getOutputDir();
-          final saveFile = File('${saveDir.path}/${pendingTask.fileItem.fileName}');
-          await saveFile.writeAsBytes(bytes);
+          // 交给 MediaStore 保存进系统公共相册；失败必须视为任务失败
+          final saved = await CameraNativeBridge.saveMediaToGallery(partial.path, pendingTask.fileItem.fileName);
+          if (saved == null || saved.isEmpty) {
+            throw StateError('保存到系统相册失败（MediaStore 拒绝写入 ${pendingTask.fileItem.fileName}）');
+          }
 
-          // 触发 Android MediaScanner 广播，使照片立刻出现在系统相册中
-          await CameraNativeBridge.notifyMediaScan(saveFile.path);
-          ExportHistoryManager().registerExported(pendingTask.fileItem.fileName, saveFile);
+          ExportHistoryManager().registerExported(pendingTask.fileItem.fileName, partial);
 
-          pendingTask.localPath = saveFile.path;
+          pendingTask.localPath = saved;
           pendingTask.status = DownloadTaskStatus.completed;
           pendingTask.progress = 1.0;
           pendingTask.error = null;
           success = true;
+
+          // 成功后清理临时分块文件
+          try {
+            if (await partial.exists()) await partial.delete();
+          } catch (_) {}
         } catch (e) {
           if (pendingTask.retryCount < 4 && driver.isConnected && !isPaused) {
             final delaySec = backoffDelays[pendingTask.retryCount];
@@ -316,7 +366,6 @@ class DownloadManager extends ChangeNotifier {
             notifyListeners();
             await Future.delayed(Duration(seconds: delaySec));
           } else {
-
             pendingTask.status = DownloadTaskStatus.failed;
             pendingTask.error = e.toString();
             break;

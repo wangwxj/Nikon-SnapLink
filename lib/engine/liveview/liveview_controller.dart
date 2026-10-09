@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
+import '../../core/settings/app_settings.dart';
 import '../../protocol/camera_driver.dart';
 import '../../protocol/nikon_driver.dart';
 import '../../protocol/nikon_liveview_parser.dart';
@@ -10,7 +11,7 @@ class LiveViewController extends ChangeNotifier {
   final CameraDriver driver;
 
   bool _isStreaming = false;
-  int _targetFps = 15; // 默认 15 FPS 监看 (约 66ms/帧，对齐官方 SnapBridge 逆向标准)
+  int _targetFps = AppSettings.instance.preferredFps;
   Uint8List? _latestFrame;
   NikonLiveViewFrame? _latestParsedFrame;
   int _fpsCounter = 0;
