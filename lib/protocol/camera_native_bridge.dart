@@ -286,5 +286,127 @@ class CameraNativeBridge {
       return false;
     }
   }
+  // ========================================================
+  // USB PTP over OTG
+  // ========================================================
+
+  /// 枚举已接入的 USB 设备（含授权状态与尼康厂商识别）。
+  static Future<List<UsbDeviceInfo>> listUsbDevices() async {
+    try {
+      final list = await _channel.invokeMethod<List<dynamic>>('listUsbDevices');
+      if (list != null) {
+        return list.map((e) => UsbDeviceInfo.fromMap(e as Map<dynamic, dynamic>)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// 请求指定 USB 设备的访问权限，返回是否授权成功。
+  static Future<bool> requestUsbPermission(String deviceName) async {
+    try {
+      final res =
+          await _channel.invokeMethod<bool>('requestUsbPermission', {'deviceName': deviceName});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 打开 USB PTP 会话（claim 接口 + OpenSession），返回会话 ID。
+  static Future<String?> usbOpenSession(String deviceName) async {
+    try {
+      return await _channel.invokeMethod<String>('usbOpenSession', {'deviceName': deviceName});
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> usbCloseSession(String deviceId) async {
+    try {
+      await _channel.invokeMethod('usbCloseSession', {'deviceId': deviceId});
+    } catch (_) {}
+  }
+
+  /// 读取相机 DeviceInfo 原始负载（与 Wi-Fi 通道 0x1001 返回一致）。
+  static Future<Uint8List?> usbQueryDeviceInfo(String deviceId) async {
+    try {
+      return await _channel.invokeMethod<Uint8List>('usbQueryDeviceInfo', {'deviceId': deviceId});
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 无数据阶段 PTP 指令。
+  static Future<void> usbExecuteOperation(
+    String deviceId,
+    int opCode, [
+    List<int> params = const [],
+  ]) async {
+    await _channel.invokeMethod('usbExecuteOperation', {
+      'deviceId': deviceId,
+      'opCode': opCode,
+      'params': params,
+    });
+  }
+
+  /// 数据输入阶段 PTP 指令（相机 -> 手机）。
+  static Future<Uint8List> usbExecuteDataIn(
+    String deviceId,
+    int opCode, [
+    List<int> params = const [],
+  ]) async {
+    final res = await _channel.invokeMethod<Uint8List>('usbExecuteDataIn', {
+      'deviceId': deviceId,
+      'opCode': opCode,
+      'params': params,
+    });
+    return res ?? Uint8List(0);
+  }
+
+  /// 数据输出阶段 PTP 指令（手机 -> 相机）。
+  static Future<void> usbExecuteDataOut(
+    String deviceId,
+    int opCode,
+    Uint8List data, [
+    List<int> params = const [],
+  ]) async {
+    await _channel.invokeMethod('usbExecuteDataOut', {
+      'deviceId': deviceId,
+      'opCode': opCode,
+      'data': data,
+      'params': params,
+    });
+  }
 }
 
+/// USB 设备元数据模型
+class UsbDeviceInfo {
+  final String deviceName;
+  final int vendorId;
+  final int productId;
+  final String name;
+  final bool hasPermission;
+  final bool isNikon;
+
+  UsbDeviceInfo({
+    required this.deviceName,
+    required this.vendorId,
+    required this.productId,
+    required this.name,
+    required this.hasPermission,
+    required this.isNikon,
+  });
+
+  factory UsbDeviceInfo.fromMap(Map<dynamic, dynamic> map) => UsbDeviceInfo(
+        deviceName: (map['deviceName'] as String?) ?? '',
+        vendorId: (map['vendorId'] as num?)?.toInt() ?? 0,
+        productId: (map['productId'] as num?)?.toInt() ?? 0,
+        name: (map['name'] as String?) ?? 'USB Camera',
+        hasPermission: map['hasPermission'] as bool? ?? false,
+        isNikon: map['isNikon'] as bool? ?? false,
+      );
+
+  String get vendorProductHex =>
+      '0x${vendorId.toRadixString(16).padLeft(4, '0').toUpperCase()}:'
+      '0x${productId.toRadixString(16).padLeft(4, '0').toUpperCase()}';
+}

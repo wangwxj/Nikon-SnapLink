@@ -5,6 +5,7 @@ import '../core/constants/ptp_opcodes.dart';
 import '../core/settings/app_settings.dart';
 import '../core/utils/byte_buffer_ext.dart';
 import 'ptp_packet.dart';
+import 'ptp_transport.dart';
 
 /// PTP 通信异常
 class PtpException implements Exception {
@@ -20,7 +21,7 @@ class PtpException implements Exception {
 
 /// 纯 Dart PTP/IP 双通道 Socket 客户端
 /// 100% 对齐原版反编译 CameraSyncForegroundService.java 握手时序与字节流规范
-class PtpIpClient {
+class PtpIpClient implements PtpTransport {
   final String host;
   final int port;
   final void Function(String message)? onLog;
@@ -48,8 +49,10 @@ class PtpIpClient {
     this.onLog,
   });
 
+  @override
   bool get isConnected => _isConnected;
   int get transactionId => _transactionId;
+  @override
   Stream<PtpPacket> get events => _eventController.stream;
 
   void _log(String msg) {
@@ -59,6 +62,7 @@ class PtpIpClient {
   }
 
   /// 连接相机并执行严格的 PTP/IP 双通道规范握手
+  @override
   Future<void> connect({Duration timeout = const Duration(seconds: 5)}) async {
     if (_isConnected) return;
 
@@ -160,6 +164,7 @@ class PtpIpClient {
   }
 
   /// 发送指令并接收 OperationResponse (不带数据包)
+  @override
   Future<void> executeOperation(int opCode, [List<int> params = const []]) {
     return _synchronized(() async {
       _transactionId++;
@@ -196,6 +201,7 @@ class PtpIpClient {
   }
 
   /// 发送指令并接收返回的大块二进制数据 (例如 LiveView JPEG 帧、照片分块)
+  @override
   Future<Uint8List> executeDataIn(int opCode, [List<int> params = const []]) {
     return _synchronized(() async {
       _transactionId++;
@@ -234,6 +240,7 @@ class PtpIpClient {
   }
 
   /// 发送指令与待写入的数据负载 (Data-Out Phase, 用于 SetDevicePropValue 等属性设置)
+  @override
   Future<void> executeDataOut(int opCode, Uint8List data, [List<int> params = const []]) {
     return _synchronized(() async {
       _transactionId++;
@@ -365,6 +372,7 @@ class PtpIpClient {
   }
 
   /// 断开连接并释放资源
+  @override
   Future<void> disconnect() async {
     _isConnected = false;
     _heartbeatTimer?.cancel();

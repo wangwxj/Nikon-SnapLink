@@ -6,6 +6,8 @@ import 'camera_driver.dart';
 import 'camera_native_bridge.dart';
 import 'nikon_liveview_parser.dart';
 import 'ptp_ip_client.dart';
+import 'ptp_transport.dart';
+import 'usb_ptp_transport.dart';
 import 'ptp_packet.dart';
 
 /// 尼康 PTP 设备信息完整描述实体 (0x1001 GetDeviceInfo)
@@ -179,7 +181,7 @@ class NikonDeviceInfo {
 /// 尼康专属相机硬件协议驱动
 /// 100% 还原反编译得到的 Nikon 私有操作码与自适应降级特性
 class NikonDriver implements CameraDriver {
-  PtpIpClient? _client;
+  PtpTransport? _client;
   CameraConnectionState _state = CameraConnectionState.disconnected;
   bool _useLegacyLiveView0x9203 = false;
   String _cameraModel = 'Nikon Camera';
@@ -281,6 +283,46 @@ class NikonDriver implements CameraDriver {
       }
 
       // 查询电池电量 (0x5001 BatteryLevel)
+      try {
+        await _queryBatteryLevel();
+      } catch (_) {}
+    } catch (e) {
+      _state = CameraConnectionState.error;
+      _stateController.add(_state);
+      rethrow;
+    }
+  }
+
+  /// 通过 USB (PTP over OTG) 连接相机。首期支持连接、浏览存储卡与分块下载。
+  Future<void> connectUsb(String deviceName, {void Function(String msg)? onLog}) async {
+    final transport = UsbPtpTransport(deviceName: deviceName, onLog: onLog);
+    await transport.connect();
+    try {
+      await connectTransport(transport, onLog: onLog);
+    } catch (e) {
+      await transport.disconnect();
+      transport.dispose();
+      rethrow;
+    }
+  }
+
+  /// 使用给定传输层（如 USB）建立连接，复用与 Wi-Fi 完全相同的上层逻辑。
+  Future<void> connectTransport(PtpTransport transport, {void Function(String msg)? onLog}) async {
+    _logCallback = onLog;
+    _state = CameraConnectionState.connecting;
+    _stateController.add(_state);
+    try {
+      _client = transport;
+      await _client!.connect();
+      _state = CameraConnectionState.connected;
+      _stateController.add(_state);
+      _client!.events.listen(_handleCameraEvent);
+
+      try {
+        await _queryDeviceInfo();
+      } catch (e) {
+        onLog?.call('查询相机设备信息提示: $e');
+      }
       try {
         await _queryBatteryLevel();
       } catch (_) {}

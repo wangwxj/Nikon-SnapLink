@@ -26,6 +26,15 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.util.Log
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbConstants
+import android.hardware.usb.UsbDeviceConnection
+import android.hardware.usb.UsbEndpoint
+import android.hardware.usb.UsbInterface
+import android.hardware.usb.UsbManager
 import android.app.Activity
 import android.content.ContentValues
 import android.net.Uri
@@ -43,6 +52,7 @@ class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.nikon.snaplink/native_camera"
     private val TAG = "SnapLinkNative"
     private val REQUEST_PICK_IMAGE = 1001
+    private val ACTION_USB_PERMISSION = "com.nikon.snaplink.USB_PERMISSION"
     private var pendingPickResult: MethodChannel.Result? = null
 
     private var wifiLock: WifiManager.WifiLock? = null
@@ -58,11 +68,18 @@ class MainActivity: FlutterActivity() {
     private var bleStatus = "disconnected"
     private var bleConnectedDeviceName: String? = null
 
+    // USB PTP
+    private var usbManager: UsbManager? = null
+    private val usbSessions = mutableMapOf<String, UsbPtpSession>()
+    private var pendingUsbPermissionResult: MethodChannel.Result? = null
+    private var pendingUsbPermissionDeviceName: String? = null
+    private var usbPermissionReceiver: BroadcastReceiver? = null
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
         val bm = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         bluetoothAdapter = bm?.adapter
+        usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
 
         // 请求关键运行时权限 (定位/近距离设备，以便系统允许读取 Wi-Fi SSID 与扫描 BLE)
         requestRuntimePermissions()
@@ -258,11 +275,218 @@ class MainActivity: FlutterActivity() {
                         }
                     }
                 }
+                // USB PTP over OTG
+                "listUsbDevices" -> result.success(listUsbDevices())
+                "requestUsbPermission" -> {
+                    val deviceName = call.argument<String>("deviceName")
+                    if (deviceName.isNullOrBlank()) {
+                        result.error("INVALID_ARG", "deviceName 不能为空", null)
+                    } else {
+                        requestUsbPermission(deviceName, result)
+                    }
+                }
+                "usbOpenSession" -> {
+                    val deviceName = call.argument<String>("deviceName")
+                    try {
+                        val id = openUsbSession(deviceName)
+                        result.success(id)
+                    } catch (e: Exception) {
+                        result.error("USB_OPEN_FAILED", e.message, null)
+                    }
+                }
+                "usbCloseSession" -> {
+                    val deviceId = call.argument<String>("deviceId") ?: pendingUsbPermissionDeviceName
+                    closeUsbSession(deviceId)
+                    result.success(true)
+                }
+                "usbQueryDeviceInfo" -> {
+                    val deviceId = call.argument<String>("deviceId")
+                    try {
+                        result.success(queryUsbDeviceInfo(requireUsbSession(deviceId)))
+                    } catch (e: Exception) {
+                        result.error("USB_QUERY_FAILED", e.message, null)
+                    }
+                }
+                "usbExecuteOperation" -> {
+                    val deviceId = call.argument<String>("deviceId")
+                    val opCode = call.argument<Int>("opCode") ?: 0
+                    val params = intArrayOf(*(call.argument<List<Int>>("params")?.toIntArray() ?: IntArray(0)))
+                    try {
+                        requireUsbSession(deviceId).executeOperation(opCode, params)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("USB_OPERATION_FAILED", e.message, null)
+                    }
+                }
+                "usbExecuteDataIn" -> {
+                    val deviceId = call.argument<String>("deviceId")
+                    val opCode = call.argument<Int>("opCode") ?: 0
+                    val params = intArrayOf(*(call.argument<List<Int>>("params")?.toIntArray() ?: IntArray(0)))
+                    try {
+                        result.success(requireUsbSession(deviceId).executeDataIn(opCode, params))
+                    } catch (e: Exception) {
+                        result.error("USB_DATA_IN_FAILED", e.message, null)
+                    }
+                }
+                "usbExecuteDataOut" -> {
+                    val deviceId = call.argument<String>("deviceId")
+                    val opCode = call.argument<Int>("opCode") ?: 0
+                    val params = intArrayOf(*(call.argument<List<Int>>("params")?.toIntArray() ?: IntArray(0)))
+                    val data = call.argument<ByteArray>("data")
+                    if (data == null) {
+                        result.error("INVALID_ARG", "data 不能为空", null)
+                    } else {
+                        try {
+                            requireUsbSession(deviceId).executeDataOut(opCode, data, params)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("USB_DATA_OUT_FAILED", e.message, null)
+                        }
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }
             }
         }
+    }
+
+    // ==================== USB PTP over OTG ====================
+
+    private fun findUsbDeviceByName(deviceName: String): UsbDevice? =
+        usbManager?.deviceList?.values?.firstOrNull { it.deviceName == deviceName }
+
+    /** 枚举已接入的 USB 设备（含尼康厂商识别与授权状态）。 */
+    private fun listUsbDevices(): List<Map<String, Any>> {
+        val mgr = usbManager ?: return emptyList()
+        return mgr.deviceList.values.map { d ->
+            val name = try { d.productName } catch (_: Exception) { null }
+            mapOf(
+                "deviceName" to d.deviceName,
+                "vendorId" to d.vendorId,
+                "productId" to d.productId,
+                "name" to (name ?: "USB Camera"),
+                "hasPermission" to mgr.hasPermission(d),
+                "isNikon" to (d.vendorId == 0x04B0),
+            )
+        }
+    }
+
+    private fun registerUsbPermissionReceiver() {
+        if (usbPermissionReceiver != null) return
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action != ACTION_USB_PERMISSION) return
+                val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                val res = pendingUsbPermissionResult
+                pendingUsbPermissionResult = null
+                res?.success(granted)
+            }
+        }
+        usbPermissionReceiver = receiver
+        val filter = IntentFilter(ACTION_USB_PERMISSION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(receiver, filter)
+        }
+    }
+
+    private fun requestUsbPermission(deviceName: String, result: MethodChannel.Result) {
+        val mgr = usbManager
+        if (mgr == null) {
+            result.error("USB_UNAVAILABLE", "UsbManager 不可用", null)
+            return
+        }
+        val device = findUsbDeviceByName(deviceName)
+        if (device == null) {
+            result.error("USB_NOT_FOUND", "未找到设备: $deviceName", null)
+            return
+        }
+        if (mgr.hasPermission(device)) {
+            result.success(true)
+            return
+        }
+        registerUsbPermissionReceiver()
+        pendingUsbPermissionDeviceName = deviceName
+        pendingUsbPermissionResult = result
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        val pi = PendingIntent.getBroadcast(
+            this, 0, Intent(ACTION_USB_PERMISSION).setPackage(packageName), flags
+        )
+        mgr.requestPermission(device, pi)
+    }
+
+    /** 选择含 Bulk IN + Bulk OUT 的接口（优先静态图像类）。 */
+    private fun selectBulkInterface(device: UsbDevice): Triple<UsbInterface, UsbEndpoint, UsbEndpoint>? {
+        val candidates = (0 until device.interfaceCount)
+            .map { device.getInterface(it) }
+            .sortedByDescending { if (it.interfaceClass == 6) 1 else 0 }
+        for (iface in candidates) {
+            var epIn: UsbEndpoint? = null
+            var epOut: UsbEndpoint? = null
+            for (i in 0 until iface.endpointCount) {
+                val ep = iface.getEndpoint(i)
+                if (ep.type == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                    if (ep.direction == UsbConstants.USB_DIR_IN && epIn == null) epIn = ep
+                    if (ep.direction == UsbConstants.USB_DIR_OUT && epOut == null) epOut = ep
+                }
+            }
+            if (epIn != null && epOut != null) return Triple(iface, epIn, epOut)
+        }
+        return null
+    }
+
+    private fun openUsbSession(deviceName: String?): String {
+        if (deviceName.isNullOrBlank()) throw IllegalArgumentException("deviceName 不能为空")
+        usbSessions.keys.firstOrNull { it.endsWith(":$deviceName") }?.let { return it }
+        val mgr = usbManager ?: throw IllegalStateException("UsbManager 不可用")
+        val device = findUsbDeviceByName(deviceName) ?: throw IllegalStateException("未找到设备: $deviceName")
+        if (!mgr.hasPermission(device)) throw IllegalStateException("缺少 USB 权限，请先授权")
+        val connection: UsbDeviceConnection = mgr.openDevice(device)
+            ?: throw IllegalStateException("openDevice 失败")
+        val selected = selectBulkInterface(device)
+        if (selected == null) {
+            connection.close()
+            throw IllegalStateException("未找到可用的 Bulk IN/OUT 端点")
+        }
+        val (iface, epIn, epOut) = selected
+        val session = UsbPtpSession(device, connection, iface, epIn, epOut)
+        try {
+            session.open()
+            session.executeOperation(0x1002, intArrayOf(1)) // OpenSession
+        } catch (e: Exception) {
+            session.close()
+            throw e
+        }
+        val id = session.deviceId
+        usbSessions[id] = session
+        return id
+    }
+
+    private fun requireUsbSession(deviceId: String?): UsbPtpSession {
+        val id = deviceId ?: usbSessions.keys.firstOrNull()
+            ?: throw IllegalStateException("USB 会话未建立")
+        return usbSessions[id] ?: throw IllegalStateException("USB 会话不存在: $id")
+    }
+
+    private fun closeUsbSession(deviceId: String?) {
+        val ids = if (deviceId != null && usbSessions.containsKey(deviceId)) {
+            listOf(deviceId)
+        } else {
+            usbSessions.keys.toList()
+        }
+        for (id in ids) {
+            try {
+                usbSessions.remove(id)?.close()
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun queryUsbDeviceInfo(session: UsbPtpSession): Map<String, Any> {
+        val raw = session.executeDataIn(0x1001) // GetDeviceInfo
+        return mapOf("raw" to raw)
     }
 
     private fun getDevicePowerInfo(): Map<String, Any> {
@@ -826,5 +1050,10 @@ class MainActivity: FlutterActivity() {
         }
         unbindProcessWifi()
         disconnectBleDevice()
+        closeUsbSession(null)
+        try {
+            usbPermissionReceiver?.let { unregisterReceiver(it) }
+        } catch (_: Exception) {}
+        usbPermissionReceiver = null
     }
 }
