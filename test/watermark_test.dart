@@ -1,8 +1,13 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snaplink/core/utils/exif_helper.dart';
 import 'package:snaplink/engine/filter/photo_filter.dart';
 import 'package:snaplink/engine/watermark/watermark_painter.dart';
 import 'package:snaplink/engine/watermark/watermark_template.dart';
+import 'package:flutter/material.dart';
+import 'package:snaplink/core/constants/colors.dart';
+import 'package:snaplink/core/theme/vant_theme.dart';
+import 'package:snaplink/ui/screens/watermark_screen.dart';
 import 'package:snaplink/ui/widgets/lightroom_histogram.dart';
 
 void main() {
@@ -247,6 +252,22 @@ void main() {
       expect(masterLayout.imageRect.top, equals(0));
     });
 
+    test('竖拍照片旋转 90 度后成品宽高互换且不裁切', () {
+      const w = 4000.0;
+      const h = 6000.0;
+      // 模拟旋转后按 srcW/srcH 互换参与排版
+      final landscapeLayout = WatermarkCanvasPainter.computeLayout(h, w, WatermarkTemplate.none);
+      expect(landscapeLayout.totalWidth, equals(h));
+      expect(landscapeLayout.totalHeight, equals(w));
+      expect(landscapeLayout.imageRect.width, equals(h));
+      expect(landscapeLayout.imageRect.height, equals(w));
+
+      final banner = WatermarkCanvasPainter.computeLayout(h, w, WatermarkTemplate.flushMasterBar);
+      expect(banner.imageRect.width, equals(h),
+          reason: '旋转后照片完整占满宽度，不裁切');
+      expect(banner.imageRect.left, equals(0));
+    });
+
     test('水印字体颜色在拍立得等模板中黑白逻辑一致性验证 (彻底修复选白字体变黑的Bug)', () {
       // 验证拍立得等模板在 textDark=false 时渲染纯白高亮字，textDark=true 时渲染深黑字
       const meta = PhotoMetadata(
@@ -282,6 +303,50 @@ void main() {
       // 上下双边框模板的默认配色：白底黑字
       expect(WatermarkTemplate.topBottomBannerBlur.defaultCardDark, isFalse);
       expect(WatermarkTemplate.topBottomBannerBlur.defaultTextDark, isTrue);
+    });
+  });
+
+  group('浅色模式直出调色面板配色回归', () {
+    test('一级/二级菜单与分段按钮不再使用硬编码白色', () {
+      // 浅色主题下，未选中项必须用可读的语义色，而不是白色。
+      SnapColors.use(Brightness.light);
+      expect(SnapColors.textSecondary, isNot(equals(Colors.white)));
+      expect(SnapColors.textSecondary, equals(SnapPalette.light.textSecondary));
+      expect(SnapColors.textInverse, equals(SnapPalette.light.textInverse));
+
+      // 约束来源：浅色面板上的菜单/按钮不应再用「未选中 = 白字」的写法。
+      // (浮在黑色照片画布上的叠加按钮仍可保留白色，故只锁定该模式)
+      final src = File('lib/ui/screens/watermark_screen.dart').readAsStringSync();
+      expect(src.contains('isSelected ? Colors.black : Colors.white70'), isFalse,
+          reason: '浅色面板的选中态菜单不应残留硬编码白字');
+      expect(src.contains('WidgetState.selected) ? Colors.black : Colors.white70'), isFalse,
+          reason: '浅色面板的分段按钮不应残留硬编码白字');
+    });
+
+    testWidgets('浅色下直出调色一级菜单渲染为深色文字', (tester) async {
+      SnapColors.use(Brightness.light);
+      await tester.pumpWidget(MaterialApp(
+        theme: VantTheme.lightTheme,
+        builder: (context, child) {
+          SnapColors.use(VantTheme.brightnessFor(
+            ThemeMode.light, MediaQuery.platformBrightnessOf(context)));
+          return child ?? const SizedBox.shrink();
+        },
+        home: const WatermarkScreen(),
+      ));
+      await tester.pumpAndSettle();
+
+      // 切到调色 Tab
+      await tester.tap(find.text('直出胶片调色'));
+      await tester.pumpAndSettle();
+
+      // 一级调色分组药丸（未选中）文字应为语义色，而非白色。
+      final groupLabel = find.text('白平衡');
+      expect(groupLabel, findsWidgets);
+      final textWidget = tester.widgetList<Text>(groupLabel).first;
+      expect(textWidget.style?.color, isNot(equals(Colors.white)),
+          reason: '浅色下未选中的一级调色菜单不能是白字');
+      expect(textWidget.style?.color, SnapColors.textSecondary);
     });
   });
 }

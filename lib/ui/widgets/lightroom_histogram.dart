@@ -266,7 +266,7 @@ class LightroomHistogramWidget extends StatelessWidget {
           // 顶部信息条: 直方图标题、相机 EXIF 与一键重置
           Row(
             children: [
-              const Icon(Icons.bar_chart, color: SnapColors.primary, size: 16),
+              Icon(Icons.bar_chart, color: SnapColors.primary, size: 16),
               const SizedBox(width: 6),
               const Text(
                 'HISTOGRAM 直方图',
@@ -281,7 +281,7 @@ class LightroomHistogramWidget extends StatelessWidget {
               if (metadata != null && metadata!.hasValidExif)
                 Text(
                   '${metadata!.iso} · ${metadata!.aperture} · ${metadata!.shutterSpeed}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: SnapColors.textSecondary,
                     fontSize: 10,
                     fontFamily: 'monospace',
@@ -292,7 +292,7 @@ class LightroomHistogramWidget extends StatelessWidget {
                 InkWell(
                   onTap: onResetAll,
                   borderRadius: BorderRadius.circular(4),
-                  child: const Padding(
+                  child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

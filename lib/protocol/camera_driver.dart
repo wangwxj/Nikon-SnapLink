@@ -17,6 +17,10 @@ class CameraFileItem {
   final String fileName;
   final String captureDate;
 
+  /// 照片像素宽高 (来自 PTP ObjectInfo, 用于判断横拍/竖拍); 0 表示未知
+  final int pixelWidth;
+  final int pixelHeight;
+
   CameraFileItem({
     required this.handle,
     required this.storageId,
@@ -24,7 +28,12 @@ class CameraFileItem {
     required this.size,
     required this.fileName,
     required this.captureDate,
+    this.pixelWidth = 0,
+    this.pixelHeight = 0,
   });
+
+  /// 已知且为竖构图 (高 > 宽) 时为 true
+  bool get isPortrait => pixelWidth > 0 && pixelHeight > 0 && pixelHeight > pixelWidth;
 
   bool get isFolder => format == 0x3001;
 
@@ -42,6 +51,8 @@ class CameraFileItem {
         'size': size,
         'fileName': fileName,
         'captureDate': captureDate,
+        'pixelWidth': pixelWidth,
+        'pixelHeight': pixelHeight,
       };
 
   factory CameraFileItem.fromJson(Map<String, dynamic> json) => CameraFileItem(
@@ -51,6 +62,8 @@ class CameraFileItem {
         size: json['size'] as int,
         fileName: json['fileName'] as String,
         captureDate: (json['captureDate'] as String?) ?? '',
+        pixelWidth: (json['pixelWidth'] as num?)?.toInt() ?? 0,
+        pixelHeight: (json['pixelHeight'] as num?)?.toInt() ?? 0,
       );
 
   String get sizeFormatted {

@@ -19,7 +19,7 @@ class CameraStatusBar extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: SnapColors.surface,
         border: Border(bottom: BorderSide(color: SnapColors.border, width: 0.8)),
       ),
@@ -46,7 +46,7 @@ class CameraStatusBar extends StatelessWidget {
           // 相机型号
           Text(
             isConnected ? driver.cameraModel : '相机未连接',
-            style: const TextStyle(
+            style: TextStyle(
               color: SnapColors.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -66,7 +66,7 @@ class CameraStatusBar extends StatelessWidget {
                 ),
                 child: Text(
                   '$fps FPS',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: SnapColors.primary,
                     fontSize: 10,
                     fontFamily: 'monospace',
@@ -78,22 +78,22 @@ class CameraStatusBar extends StatelessWidget {
             ],
 
             // 存储卡指示
-            const Icon(Icons.sd_card_outlined, size: 14, color: SnapColors.textSecondary),
+            Icon(Icons.sd_card_outlined, size: 14, color: SnapColors.textSecondary),
             const SizedBox(width: 4),
             Text(
               driver.isSingleSlotCamera ? 'SD卡' : 'SLOT 1',
-              style: const TextStyle(color: SnapColors.textSecondary, fontSize: 11, fontFamily: 'monospace'),
+              style: TextStyle(color: SnapColors.textSecondary, fontSize: 11, fontFamily: 'monospace'),
             ),
             const SizedBox(width: 10),
 
             // 电量指示
-            const Icon(Icons.battery_5_bar, size: 16, color: SnapColors.success),
+            Icon(Icons.battery_5_bar, size: 16, color: SnapColors.success),
             Text(
               '${driver.batteryLevel}%',
-              style: const TextStyle(color: SnapColors.textSecondary, fontSize: 11, fontFamily: 'monospace'),
+              style: TextStyle(color: SnapColors.textSecondary, fontSize: 11, fontFamily: 'monospace'),
             ),
           ] else ...[
-            const Text(
+            Text(
               '点击连接',
               style: TextStyle(color: SnapColors.primary, fontSize: 12),
             ),

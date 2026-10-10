@@ -152,7 +152,7 @@ class _RootScaffoldState extends State<RootScaffold> {
 
           setState(() => _currentIndex = index);
         },
-        items: const [
+        items: [
           BottomNavigationBarItem(
             icon: Icon(Icons.wifi_tethering),
             activeIcon: Icon(Icons.wifi_tethering, color: SnapColors.primary),

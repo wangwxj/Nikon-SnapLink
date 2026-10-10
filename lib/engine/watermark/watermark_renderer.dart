@@ -41,9 +41,12 @@ class WatermarkRenderer {
     bool cardDark = false,
     bool textDark = false,
     String? fontFamily,
+    int quarterTurns = 0,
+    bool mirrorX = false,
   }) async {
-    final srcW = sourceImage.width.toDouble();
-    final srcH = sourceImage.height.toDouble();
+    final rotated = quarterTurns % 2 != 0;
+    final srcW = rotated ? sourceImage.height.toDouble() : sourceImage.width.toDouble();
+    final srcH = rotated ? sourceImage.width.toDouble() : sourceImage.height.toDouble();
 
     // 1. 精确计算目标排版物理像素总宽高 (含边框与展签留白)
     final layout = WatermarkCanvasPainter.computeLayout(srcW, srcH, template, spacingScale);
@@ -66,6 +69,8 @@ class WatermarkRenderer {
       cardDark: cardDark,
       textDark: textDark,
       fontFamily: fontFamily,
+      quarterTurns: quarterTurns,
+      mirrorX: mirrorX,
     );
 
     // 绘制完整合成图

@@ -862,19 +862,19 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                const ListTile(
+                ListTile(
                   leading: Icon(Icons.high_quality, color: SnapColors.primary),
                   title: Text('实时流分辨率', style: TextStyle(color: Colors.white, fontSize: 14)),
                   subtitle: Text('自适应高清硬件流 (640x424 @ 30FPS)', style: TextStyle(color: Colors.white54, fontSize: 12)),
                   trailing: Icon(Icons.check, color: SnapColors.primary, size: 20),
                 ),
-                const ListTile(
+                ListTile(
                   leading: Icon(Icons.speed, color: SnapColors.primary),
                   title: Text('电动变焦步进驱动', style: TextStyle(color: Colors.white, fontSize: 14)),
                   subtitle: Text('短脉冲 320ms / 连续变焦速度 5 级', style: TextStyle(color: Colors.white54, fontSize: 12)),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.battery_charging_full, color: SnapColors.success),
+                  leading: Icon(Icons.battery_charging_full, color: SnapColors.success),
                   title: const Text('低电量智能保护', style: TextStyle(color: Colors.white, fontSize: 14)),
                   subtitle: const Text('相机电量低于 15% 时暂停大负荷传输与拉流', style: TextStyle(color: Colors.white54, fontSize: 12)),
                   trailing: Switch(
@@ -974,7 +974,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                       ),
                       child: Text(
                         widget.controller.driver.cameraModel,
-                        style: const TextStyle(color: SnapColors.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: SnapColors.primary, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1013,12 +1013,12 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                             // FPS & 电池
                             Text(
                               '${widget.controller.currentFps} FPS',
-                              style: const TextStyle(color: SnapColors.primary, fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold),
+                              style: TextStyle(color: SnapColors.primary, fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(width: 8),
                             Row(
                               children: [
-                                const Icon(Icons.battery_charging_full, size: 14, color: SnapColors.success),
+                                Icon(Icons.battery_charging_full, size: 14, color: SnapColors.success),
                                 const SizedBox(width: 2),
                                 Text(
                                   '${params.batteryLevel}%',
@@ -1145,7 +1145,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                             color: Colors.white10,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Row(
+                          child: Row(
                             children: [
                               Icon(Icons.zoom_out, size: 14, color: SnapColors.primary),
                               SizedBox(width: 4),
@@ -1165,7 +1165,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                             color: Colors.white10,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Row(
+                          child: Row(
                             children: [
                               Text('TELE', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                               SizedBox(width: 4),
@@ -1253,13 +1253,13 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                   errorBuilder: (ctx, err, stack) {
                     return Container(
                       color: const Color(0xFF0D0D10),
-                      child: const Center(
+                      child: Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.sync, size: 36, color: SnapColors.primary),
                             SizedBox(height: 8),
-                            Text('正在解析取景帧数据...', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
+                            Text('正在解析取景帧数据...', style: TextStyle(color: SnapPalette.dark.textSecondary, fontSize: 12)),
                           ],
                         ),
                       ),
@@ -1277,14 +1277,14 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                         Icon(
                           isConnected ? Icons.videocam_outlined : Icons.link_off,
                           size: 48,
-                          color: SnapColors.textTertiary,
+                          color: SnapPalette.dark.textTertiary,
                         ),
                         const SizedBox(height: 12),
                         Text(
                           isConnected
                               ? (widget.controller.isStreaming ? '正在缓冲实时取景硬件流...' : '实时取景已就绪，点击下方开启')
                               : '请先在「连接」页面连入相机 Wi-Fi',
-                          style: const TextStyle(color: SnapColors.textSecondary, fontSize: 13),
+                          style: TextStyle(color: SnapPalette.dark.textSecondary, fontSize: 13),
                         ),
                         if (isConnected && !widget.controller.isStreaming) ...[
                           const SizedBox(height: 16),
@@ -1376,7 +1376,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                         const SizedBox(width: 8),
                         Text(
                           widget.controller.zoomActiveDirection == 'TELE' ? '长焦 (TELE) 变焦驱动中' : '广角 (WIDE) 变焦驱动中',
-                          style: const TextStyle(color: SnapColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
+                          style: TextStyle(color: SnapColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                       ],
                     ),
@@ -1409,7 +1409,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('$label ', style: const TextStyle(color: SnapColors.textTertiary, fontSize: 10)),
+          Text('$label ', style: TextStyle(color: SnapColors.textTertiary, fontSize: 10)),
           Text(
             value,
             style: TextStyle(
@@ -1421,7 +1421,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
           ),
           if (onTap != null) ...[
             const SizedBox(width: 2),
-            const Icon(Icons.arrow_drop_down, size: 10, color: SnapColors.primary),
+            Icon(Icons.arrow_drop_down, size: 10, color: SnapColors.primary),
           ],
         ],
       ),
@@ -1674,7 +1674,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                         children: [
                           Text(
                             activeVal,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: SnapColors.primary,
                               fontSize: 32,
                               fontWeight: FontWeight.w900,

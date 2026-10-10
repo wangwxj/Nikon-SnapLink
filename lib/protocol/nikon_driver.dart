@@ -942,6 +942,11 @@ class NikonDriver implements CameraDriver {
       final storageId = bd.getUint32(0, Endian.little);
       final format = bd.getUint16(4, Endian.little);
       final size = bd.getUint32(8, Endian.little);
+      // 标准 PTP ObjectInfo 布局: 偏移 26/30 为 ImagePixWidth / ImagePixHeight
+      // (偏移 52 的文件名解析与规范 SequenceNumber 布局一致, 可交叉验证)
+      // 用于在不下载原图的情况下判断照片是横拍还是竖拍
+      final pixWidth = bd.getUint32(26, Endian.little);
+      final pixHeight = bd.getUint32(30, Endian.little);
 
       // 解析偏移 52 处的文件名
       final reader = PtpByteReader(data.sublist(52));
@@ -955,6 +960,8 @@ class NikonDriver implements CameraDriver {
         size: size,
         fileName: fileName.isEmpty ? 'DSC_$handle.JPG' : fileName,
         captureDate: captureDate,
+        pixelWidth: pixWidth,
+        pixelHeight: pixHeight,
       );
       _objectInfoCache[handle] = item;
       return item;

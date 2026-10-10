@@ -111,8 +111,8 @@ class AppReleaseInfo {
 class AppUpdateManager {
   AppUpdateManager._();
 
-  static const String currentVersion = '1.1.0';
-  static const int currentVersionCode = 2;
+  static const String currentVersion = '1.2.0';
+  static const int currentVersionCode = 3;
 
   static const String giteeApiUrl = 'https://gitee.com/api/v5/repos/lyb82ndkkkl/Nikon-SnapLink/releases/latest';
   static const String githubApiUrl = 'https://api.github.com/repos/lyb82ndkf-lab/Nikon-SnapLink/releases/latest';
@@ -989,3 +989,4 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
     );
   }
 }
+

@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snaplink/core/settings/app_settings.dart';
 import 'package:snaplink/core/utils/lru_image_cache.dart';
@@ -10,7 +11,7 @@ void main() {
   group('AppSettings 默认值与归一化', () {
     setUp(() => AppSettings.instance.resetForTest());
 
-    test('默认目标帧率与控制器一致为 15，且 lowPower 默认 15%', () {
+    test('默认值', () {
       expect(AppSettings.defaultPreferredFps, equals(15));
       expect(AppSettings.instance.preferredFps, equals(15));
       expect(AppSettings.instance.powerThreshold, equals(15));
@@ -18,6 +19,20 @@ void main() {
       expect(AppSettings.instance.downloadRaw, isFalse);
       expect(AppSettings.instance.cameraIp, equals('192.168.0.1'));
       expect(AppSettings.instance.cameraPort, equals(15740));
+      expect(AppSettings.instance.themeMode, equals(AppThemeMode.system));
+    });
+
+    test('外观模式切换并映射到 Material ThemeMode', () {
+      AppSettings.instance.setThemeMode(AppThemeMode.light);
+      expect(AppSettings.instance.themeMode, equals(AppThemeMode.light));
+      expect(AppSettings.instance.materialThemeMode, equals(ThemeMode.light));
+
+      AppSettings.instance.setThemeMode(AppThemeMode.dark);
+      expect(AppSettings.instance.themeMode, equals(AppThemeMode.dark));
+      expect(AppSettings.instance.materialThemeMode, equals(ThemeMode.dark));
+
+      AppSettings.instance.setThemeMode(AppThemeMode.system);
+      expect(AppSettings.instance.materialThemeMode, equals(ThemeMode.system));
     });
 
     test('非法帧率/阈值被归一化到合法集合', () {
@@ -42,7 +57,6 @@ void main() {
       final cache = LruImageCache(maxEntries: 2, maxBytes: 1 << 30);
       cache['a'] = Uint8List.fromList([1]);
       cache['b'] = Uint8List.fromList([2]);
-      // 访问 a 使其变为最近使用
       expect(cache['a'], isNotNull);
       cache['c'] = Uint8List.fromList([3]);
       expect(cache.containsKey('b'), isFalse, reason: 'b 应被淘汰');
@@ -63,7 +77,4 @@ void main() {
       expect(cameraCacheKey(0x00020002, 100), isNot(equals(cameraCacheKey(0x00010001, 100))));
     });
   });
-
-  // 说明：AppSettings 的落盘/重启保持需要 path_provider 平台通道，
-  // 在纯单测环境无法直接跑通，改由真机验收覆盖（见方案 Test Plan）。
 }

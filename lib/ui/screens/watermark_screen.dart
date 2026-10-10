@@ -23,11 +23,63 @@ class WatermarkScreen extends StatefulWidget {
     this.initialMetadata,
   });
 
+
+
+
+
   @override
   State<WatermarkScreen> createState() => WatermarkScreenState();
 }
 
 class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProviderStateMixin {
+
+  Widget _previewToolButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+    bool active = false,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: active ? SnapColors.primary : Colors.black.withAlpha(160),
+            shape: BoxShape.circle,
+            border: Border.all(color: active ? Colors.transparent : Colors.white24),
+          ),
+          child: Icon(
+            icon,
+            size: 15,
+            color: active ? Colors.black : Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  double _photoAspect(BuildContext context) {
+    final img = _decodedImage;
+    if (img == null) return 4 / 3;
+    final rotated = _previewQuarterTurns % 2 != 0;
+    return rotated ? img.height / img.width : img.width / img.height;
+  }
+  int _previewFlex(BuildContext context) =>
+      _photoAspect(context) < 1.0 ? 15 : 10;
+  int _panelFlex(BuildContext context) =>
+      _photoAspect(context) < 1.0 ? 6 : 9;
+  void _rotatePreview() {
+    if (_decodedImage == null) return;
+    setState(() => _previewQuarterTurns = (_previewQuarterTurns + 1) % 4);
+  }
+
+  void _mirrorPreview() {
+    if (_decodedImage == null) return;
+    setState(() => _previewMirrorX = !_previewMirrorX);
+  }
   // 当前加载的图像与原始字节
   ui.Image? _decodedImage;
   bool _isLoadingImage = false;
@@ -46,6 +98,8 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
   List<int>? _sampledB;
   double _spacingScale = 1.0;
   bool _showDetails = true;
+  int _previewQuarterTurns = 0; // 预览与导出的顺时针 90 度旋转次数
+  bool _previewMirrorX = false; // 预览与导出的水平镜像
 
   // 水印精细化：边框颜色 / 字体颜色 (黑白二选一) + 内置字体
   bool _cardDark = false; // false = 白底 (bottomBannerBlur 默认)
@@ -208,7 +262,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
     if (_decodedImage == null) {
       // 提示用户导入图片
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('请先点击右上角相册图标选择照片，或从相机相册导入'),
           backgroundColor: SnapColors.warning,
         ),
@@ -242,7 +296,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
           builder: (ctx) => AlertDialog(
             backgroundColor: SnapColors.cardElevated,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Row(
+            title: Row(
               children: [
                 Icon(Icons.check_circle, color: SnapColors.success, size: 22),
                 SizedBox(width: 8),
@@ -253,13 +307,13 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('排版风格: ${_selectedTemplate.label}', style: const TextStyle(color: SnapColors.textSecondary, fontSize: 13)),
+                Text('排版风格: ${_selectedTemplate.label}', style: TextStyle(color: SnapColors.textSecondary, fontSize: 13)),
                 const SizedBox(height: 4),
-                Text('直出调色: ${_selectedFilter.label} (${(_filterIntensity * 100).round()}%)', style: const TextStyle(color: SnapColors.textSecondary, fontSize: 13)),
+                Text('直出调色: ${_selectedFilter.label} (${(_filterIntensity * 100).round()}%)', style: TextStyle(color: SnapColors.textSecondary, fontSize: 13)),
                 const SizedBox(height: 4),
-                Text('输出分辨率: ${result.width} × ${result.height}', style: const TextStyle(color: SnapColors.textSecondary, fontSize: 13)),
+                Text('输出分辨率: ${result.width} × ${result.height}', style: TextStyle(color: SnapColors.textSecondary, fontSize: 13)),
                 const SizedBox(height: 4),
-                Text('文件大小: ${(result.byteLength / 1024 / 1024).toStringAsFixed(2)} MB', style: const TextStyle(color: SnapColors.textSecondary, fontSize: 13)),
+                Text('文件大小: ${(result.byteLength / 1024 / 1024).toStringAsFixed(2)} MB', style: TextStyle(color: SnapColors.textSecondary, fontSize: 13)),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -268,7 +322,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.white10),
                   ),
-                  child: const Text(
+                  child: Text(
                     '已保存至系统相册 (Pictures/SnapLink)，可在手机自带相册即刻查看。',
                     style: TextStyle(color: SnapColors.primary, fontSize: 11),
                   ),
@@ -278,7 +332,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('完成', style: TextStyle(color: SnapColors.primary, fontWeight: FontWeight.bold)),
+                child: Text('完成', style: TextStyle(color: SnapColors.primary, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -326,14 +380,14 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('微调拍摄参数', style: TextStyle(color: SnapColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text('微调拍摄参数', style: TextStyle(color: SnapColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
                     IconButton(
-                      icon: const Icon(Icons.close, color: SnapColors.textTertiary),
+                      icon: Icon(Icons.close, color: SnapColors.textTertiary),
                       onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
                 ),
-                const Text('对无芯片手动镜头或无 EXIF 照片，可在此自由修改显示参数', style: TextStyle(color: SnapColors.textTertiary, fontSize: 11)),
+                Text('对无芯片手动镜头或无 EXIF 照片，可在此自由修改显示参数', style: TextStyle(color: SnapColors.textTertiary, fontSize: 11)),
                 const SizedBox(height: 16),
                 _buildEditField('相机机型', cameraController, '如 Z 30, Z 8, Z fc'),
                 const SizedBox(height: 10),
@@ -395,21 +449,21 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: SnapColors.textSecondary, fontSize: 11)),
+        Text(label, style: TextStyle(color: SnapColors.textSecondary, fontSize: 11)),
         const SizedBox(height: 4),
         TextField(
           controller: controller,
-          style: const TextStyle(color: SnapColors.textPrimary, fontSize: 13),
+          style: TextStyle(color: SnapColors.textPrimary, fontSize: 13),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(color: Colors.white24, fontSize: 12),
+            hintStyle: TextStyle(color: SnapColors.textTertiary, fontSize: 12),
             filled: true,
             fillColor: SnapColors.card,
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: SnapColors.border)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: SnapColors.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: SnapColors.primary)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: SnapColors.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: SnapColors.border)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: SnapColors.primary)),
           ),
         ),
       ],
@@ -430,8 +484,8 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
           ),
           IconButton(
             icon: _isExporting
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: SnapColors.primary))
-                : const Icon(Icons.download, color: SnapColors.primary),
+                ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: SnapColors.primary))
+                : Icon(Icons.download, color: SnapColors.primary),
             tooltip: '保存高清成片至相册',
             onPressed: _isExporting ? null : _exportPhoto,
           ),
@@ -441,20 +495,9 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
         children: [
           // 1. 顶部所见即所得 (WYSIWYG) 实时画布预览区
           Expanded(
-            flex: 11,
+            flex: _previewFlex(context),
             child: Container(
               margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(140),
-                    blurRadius: 18,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
                 child: Stack(
@@ -465,9 +508,12 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                       builder: (context, constraints) {
                         var canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
                         if (_decodedImage != null) {
+                          final rotated = _previewQuarterTurns % 2 != 0;
+                          final srcW = rotated ? _decodedImage!.height.toDouble() : _decodedImage!.width.toDouble();
+                          final srcH = rotated ? _decodedImage!.width.toDouble() : _decodedImage!.height.toDouble();
                           final layout = WatermarkCanvasPainter.computeLayout(
-                            _decodedImage!.width.toDouble(),
-                            _decodedImage!.height.toDouble(),
+                            srcW,
+                            srcH,
                             _selectedTemplate,
                             _spacingScale,
                           );
@@ -498,12 +544,38 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                                 cardDark: _cardDark,
                                 textDark: _textDark,
                                 fontFamily: _watermarkFontFamily,
+                                quarterTurns: _previewQuarterTurns,
+                                mirrorX: _previewMirrorX,
                               ),
                             ),
                           ),
                         );
                       },
                     ),
+
+
+                    // 竖屏照片预览工具：旋转与镜像（同时作用于导出）
+                    if (_decodedImage != null)
+                      Positioned(
+                        left: 10,
+                        top: 10,
+                        child: Row(
+                          children: [
+                            _previewToolButton(
+                              icon: Icons.rotate_right,
+                              tooltip: '旋转 90°',
+                              onTap: _rotatePreview,
+                            ),
+                            const SizedBox(width: 6),
+                            _previewToolButton(
+                              icon: Icons.flip,
+                              tooltip: '水平镜像',
+                              onTap: _mirrorPreview,
+                              active: _previewMirrorX,
+                            ),
+                          ],
+                        ),
+                      ),
 
                     // 原片与调色长按对比悬浮指示器
                     if (_decodedImage != null && (!_adjustments.isDefault || _selectedFilter != PhotoFilterType.original))
@@ -547,7 +619,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                       ),
 
                     if (_isLoadingImage)
-                      const Center(child: CircularProgressIndicator(color: SnapColors.primary)),
+                      Center(child: CircularProgressIndicator(color: SnapColors.primary)),
 
                     if (_decodedImage == null && !_isLoadingImage)
                       Positioned(
@@ -560,7 +632,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           ),
-                          icon: const Icon(Icons.add_photo_alternate, size: 16, color: SnapColors.primary),
+                          icon: Icon(Icons.add_photo_alternate, size: 16, color: SnapColors.primary),
                           label: const Text('选择本地照片进行调色加水印', style: TextStyle(fontSize: 12)),
                           onPressed: _pickImageFromGallery,
                         ),
@@ -577,19 +649,19 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
             color: SnapColors.card,
             child: Row(
               children: [
-                const Icon(Icons.camera_alt, size: 15, color: SnapColors.primary),
+                Icon(Icons.camera_alt, size: 15, color: SnapColors.primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     '${_metadata.titleText}  |  ${_metadata.exposureSummary}',
-                    style: const TextStyle(color: SnapColors.textSecondary, fontSize: 11, fontFamily: 'monospace'),
+                    style: TextStyle(color: SnapColors.textSecondary, fontSize: 11, fontFamily: 'monospace'),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 InkWell(
                   onTap: _showMetadataEditSheet,
                   borderRadius: BorderRadius.circular(4),
-                  child: const Padding(
+                  child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -624,7 +696,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
 
           // 4. 底部面板内容
           Expanded(
-            flex: 8,
+            flex: _panelFlex(context),
             child: TabBarView(
               controller: _tabController,
               children: [
@@ -643,7 +715,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
 
   /// 构建水印模板排版结构线框缩略示意
   Widget _buildTemplateSchematic(WatermarkTemplate t, bool isSelected) {
-    final accent = isSelected ? SnapColors.primary : Colors.white60;
+    final accent = isSelected ? SnapColors.primary : SnapColors.textTertiary;
     return Container(
       width: 38,
       height: 38,
@@ -853,13 +925,13 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                           ),
                         ),
                         if (isSelected)
-                          const Icon(Icons.check_circle, size: 13, color: SnapColors.primary),
+                          Icon(Icons.check_circle, size: 13, color: SnapColors.primary),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Text(
                       t.description,
-                      style: const TextStyle(color: SnapColors.textTertiary, fontSize: 9),
+                      style: TextStyle(color: SnapColors.textTertiary, fontSize: 9),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -907,15 +979,15 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
             ),
             child: Row(
               children: [
-                const Icon(Icons.check_circle_outline, color: SnapColors.primary, size: 22),
-                const SizedBox(width: 10),
-                const Expanded(
+                Icon(Icons.check_circle_outline, color: SnapColors.primary, size: 22),
+                SizedBox(width: 10),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         '当前处于【纯滤镜调色模式】',
-                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: SnapColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
                       ),
                       SizedBox(height: 2),
                       Text(
@@ -927,7 +999,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                 ),
                 TextButton(
                   onPressed: () => _tabController.animateTo(1),
-                  child: const Text('去调色', style: TextStyle(color: SnapColors.primary, fontWeight: FontWeight.bold)),
+                  child: Text('去调色', style: TextStyle(color: SnapColors.primary, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -936,7 +1008,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
           // 边距与留白微调
           Row(
             children: [
-              const Text('边框缩放比例', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
+              Text('边框缩放比例', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
               Expanded(
                 child: Slider(
                   value: _spacingScale,
@@ -949,7 +1021,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                   onChanged: (val) => setState(() => _spacingScale = val),
                 ),
               ),
-              Text('${(_spacingScale * 100).round()}%', style: const TextStyle(color: SnapColors.primary, fontSize: 11, fontFamily: 'monospace')),
+              Text('${(_spacingScale * 100).round()}%', style: TextStyle(color: SnapColors.primary, fontSize: 11, fontFamily: 'monospace')),
             ],
           ),
 
@@ -957,7 +1029,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('展示拍摄时间与细节', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
+              Text('展示拍摄时间与细节', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
               Switch(
                 value: _showDetails,
                 activeThumbColor: SnapColors.primary,
@@ -971,7 +1043,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('字体', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
+              Text('字体', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
               SegmentedButton<String>(
                 segments: const [
                   ButtonSegment(value: 'default', label: Text('默认')),
@@ -992,7 +1064,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('边框颜色', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
+                Text('边框颜色', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
                 SegmentedButton<bool>(
                   segments: [
                     ButtonSegment(value: false, label: const Text('白'), icon: _colorSwatch(Colors.white)),
@@ -1010,7 +1082,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('字体颜色', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
+              Text('字体颜色', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
               SegmentedButton<bool>(
                 segments: [
                   ButtonSegment(value: false, label: const Text('白'), icon: _colorSwatch(Colors.white)),
@@ -1037,9 +1109,11 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
         (states) => states.contains(WidgetState.selected) ? SnapColors.primary : SnapColors.card,
       ),
       foregroundColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected) ? Colors.black : Colors.white70,
+        (states) => states.contains(WidgetState.selected)
+            ? SnapColors.textInverse
+            : SnapColors.textSecondary,
       ),
-      side: WidgetStateProperty.all(const BorderSide(color: SnapColors.border, width: 0.8)),
+      side: WidgetStateProperty.all(BorderSide(color: SnapColors.border, width: 0.8)),
       textStyle: WidgetStateProperty.all(const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
     );
   }
@@ -1128,7 +1202,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                   Text(
                     _selectedTemplate == WatermarkTemplate.none ? '当前模式: 纯调色直出 (无水印)' : '当前水印: ${_selectedTemplate.label}',
                     style: TextStyle(
-                      color: _selectedTemplate == WatermarkTemplate.none ? SnapColors.success : Colors.white,
+                      color: _selectedTemplate == WatermarkTemplate.none ? SnapColors.success : SnapColors.textPrimary,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1152,7 +1226,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                   child: Text(
                     _selectedTemplate == WatermarkTemplate.none ? '开启水印' : '关闭水印 (仅调色)',
                     style: TextStyle(
-                      color: _selectedTemplate == WatermarkTemplate.none ? SnapColors.primary : Colors.white70,
+                      color: SnapColors.primary,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1191,7 +1265,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                     child: Text(
                       groups[idx],
                       style: TextStyle(
-                        color: isSelected ? Colors.black : Colors.white70,
+                        color: isSelected ? SnapColors.textInverse : SnapColors.textSecondary,
                         fontSize: 12,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
@@ -1406,7 +1480,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: SnapColors.border),
           ),
-          child: const Row(
+          child: Row(
             children: [
               Icon(Icons.palette_outlined, size: 16, color: SnapColors.primary),
               SizedBox(width: 8),
@@ -1550,7 +1624,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                   Expanded(
                     child: Text(
                       filter.code,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: SnapColors.textTertiary,
                         fontSize: 9.5,
                         fontFamily: 'monospace',
@@ -1561,7 +1635,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                     ),
                   ),
                   if (isSelected)
-                    const Icon(Icons.check_circle, size: 13, color: SnapColors.primary),
+                    Icon(Icons.check_circle, size: 13, color: SnapColors.primary),
                 ],
               ),
               const SizedBox(height: 3),
@@ -1627,7 +1701,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                 selectedColor: SnapColors.primary,
                 backgroundColor: SnapColors.card,
                 labelStyle: TextStyle(
-                  color: isSelected ? Colors.black : Colors.white70,
+                  color: isSelected ? SnapColors.textInverse : SnapColors.textSecondary,
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
@@ -1708,12 +1782,12 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
             children: [
               Row(
                 children: [
-                  const Icon(Icons.auto_awesome, size: 14, color: SnapColors.primary),
+                  Icon(Icons.auto_awesome, size: 14, color: SnapColors.primary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '【${_selectedFilter.label}】${_selectedFilter.description}',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: SnapColors.textPrimary, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -1721,12 +1795,12 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
               const SizedBox(height: 4),
               Row(
                 children: [
-                  const Icon(Icons.tune, size: 12, color: SnapColors.textTertiary),
+                  Icon(Icons.tune, size: 12, color: SnapColors.textTertiary),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       '机内配方: ${_selectedFilter.recipeSummary}',
-                      style: const TextStyle(color: SnapColors.textSecondary, fontSize: 10, fontFamily: 'monospace'),
+                      style: TextStyle(color: SnapColors.textSecondary, fontSize: 10, fontFamily: 'monospace'),
                     ),
                   ),
                 ],
@@ -1740,7 +1814,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
         // 5. 预设浓度滑块
         Row(
           children: [
-            const Text('预设浓度', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
+            Text('预设浓度', style: TextStyle(color: SnapColors.textSecondary, fontSize: 12)),
             Expanded(
               child: Slider(
                 value: _filterIntensity,
@@ -1757,7 +1831,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
             ),
             Text(
               '${(_filterIntensity * 100).round()}%',
-              style: const TextStyle(color: SnapColors.primary, fontSize: 11, fontFamily: 'monospace'),
+              style: TextStyle(color: SnapColors.primary, fontSize: 11, fontFamily: 'monospace'),
             ),
           ],
         ),
@@ -1778,13 +1852,13 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                 ),
               );
             },
-            icon: const Icon(Icons.tune, size: 16, color: SnapColors.primary),
+            icon: Icon(Icons.tune, size: 16, color: SnapColors.primary),
             label: Text(
               '载入【${_selectedFilter.label}】参数至滑块 (支持深度微调)',
-              style: const TextStyle(color: SnapColors.primary, fontSize: 12, fontWeight: FontWeight.bold),
+              style: TextStyle(color: SnapColors.primary, fontSize: 12, fontWeight: FontWeight.bold),
             ),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: SnapColors.primary, width: 0.8),
+              side: BorderSide(color: SnapColors.primary, width: 0.8),
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
@@ -1871,7 +1945,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
               Text(
                 title,
                 style: TextStyle(
-                  color: isModified ? Colors.white : SnapColors.textSecondary,
+                  color: isModified ? SnapColors.primary : SnapColors.textSecondary,
                   fontSize: 12,
                   fontWeight: isModified ? FontWeight.bold : FontWeight.w500,
                 ),
@@ -1879,7 +1953,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
               const SizedBox(width: 6),
               Text(
                 code,
-                style: const TextStyle(color: SnapColors.textTertiary, fontSize: 10, fontFamily: 'monospace'),
+                style: TextStyle(color: SnapColors.textTertiary, fontSize: 10, fontFamily: 'monospace'),
               ),
               const Spacer(),
               InkWell(
@@ -1888,7 +1962,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: isModified ? SnapColors.primary.withAlpha(35) : Colors.white.withAlpha(12),
+                    color: isModified ? SnapColors.primary.withAlpha(35) : SnapColors.border,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -1909,7 +1983,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
             const SizedBox(height: 4),
             Text(
               hint,
-              style: const TextStyle(color: SnapColors.textTertiary, fontSize: 10),
+              style: TextStyle(color: SnapColors.textTertiary, fontSize: 10),
             ),
           ],
 
@@ -1933,7 +2007,7 @@ class WatermarkScreenState extends State<WatermarkScreen> with SingleTickerProvi
                   trackHeight: trackGradient != null ? 3.0 : 4.0,
                   activeTrackColor: trackGradient != null ? Colors.transparent : SnapColors.primary,
                   inactiveTrackColor: trackGradient != null ? Colors.transparent : SnapColors.border,
-                  thumbColor: Colors.white,
+                  thumbColor: SnapColors.primary,
                   thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                   overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
                 ),

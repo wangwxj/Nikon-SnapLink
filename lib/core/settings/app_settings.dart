@@ -2,16 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:path_provider/path_provider.dart';
 
 /// 轻量级应用设置（path_provider + JSON 持久化，不引入新依赖）。
-///
-/// 所有用户可配置项集中于此；[ChangeNotifier] 让界面与控制器实时同步。
 class AppSettings extends ChangeNotifier {
   AppSettings._();
   static final AppSettings instance = AppSettings._();
 
-  // ---------------- 默认值 ----------------
   static const String defaultCameraIp = '192.168.0.1';
   static const int defaultCameraPort = 15740;
   static const bool defaultAutoBindNetwork = true;
@@ -20,11 +18,11 @@ class AppSettings extends ChangeNotifier {
   static const int defaultPreferredFps = 15;
   static const bool defaultPowerProtectionEnabled = true;
   static const int defaultPowerThreshold = 15;
+  static const AppThemeMode defaultThemeMode = AppThemeMode.system;
 
   static const List<int> fpsOptions = [4, 8, 15];
   static const List<int> powerThresholdOptions = [10, 15, 20, 30];
 
-  // ---------------- 当前值 ----------------
   String cameraIp = defaultCameraIp;
   int cameraPort = defaultCameraPort;
   bool autoBindNetwork = defaultAutoBindNetwork;
@@ -33,6 +31,7 @@ class AppSettings extends ChangeNotifier {
   int preferredFps = defaultPreferredFps;
   bool powerProtectionEnabled = defaultPowerProtectionEnabled;
   int powerThreshold = defaultPowerThreshold;
+  AppThemeMode themeMode = defaultThemeMode;
 
   File? _file;
   bool _suppressSave = false;
@@ -44,7 +43,6 @@ class AppSettings extends ChangeNotifier {
     return _file = File('${dir.path}/snaplink_settings.json');
   }
 
-  /// 启动时加载。文件缺失/损坏时静默退回默认值，绝不阻塞启动。
   Future<void> load() async {
     _suppressSave = true;
     try {
@@ -63,6 +61,7 @@ class AppSettings extends ChangeNotifier {
           _readBool(m, 'powerProtectionEnabled', defaultPowerProtectionEnabled);
       powerThreshold =
           _normalizeThreshold(_readInt(m, 'powerThreshold', defaultPowerThreshold));
+      themeMode = parseThemeMode(m['themeMode']);
     } catch (_) {
       // 配置文件损坏：保持默认值
     } finally {
@@ -70,7 +69,6 @@ class AppSettings extends ChangeNotifier {
     }
   }
 
-  /// 立即持久化（测试可直接 await）。
   Future<void> save() async {
     try {
       final file = await _prefFile();
@@ -83,6 +81,7 @@ class AppSettings extends ChangeNotifier {
         'preferredFps': preferredFps,
         'powerProtectionEnabled': powerProtectionEnabled,
         'powerThreshold': powerThreshold,
+        'themeMode': themeMode.name,
       }));
     } catch (_) {
       // 落盘失败不中断用户操作
@@ -94,7 +93,11 @@ class AppSettings extends ChangeNotifier {
     save();
   }
 
-  // ---------------- 变更入口（统一 notify + 落盘）----------------
+  ThemeMode get materialThemeMode => switch (themeMode) {
+        AppThemeMode.system => ThemeMode.system,
+        AppThemeMode.light => ThemeMode.light,
+        AppThemeMode.dark => ThemeMode.dark,
+      };
 
   void setCameraIp(String value) {
     final v = value.trim();
@@ -155,6 +158,13 @@ class AppSettings extends ChangeNotifier {
     _scheduleSave();
   }
 
+  void setThemeMode(AppThemeMode value) {
+    if (value == themeMode) return;
+    themeMode = value;
+    notifyListeners();
+    _scheduleSave();
+  }
+
   @visibleForTesting
   void resetForTest() {
     cameraIp = defaultCameraIp;
@@ -165,8 +175,16 @@ class AppSettings extends ChangeNotifier {
     preferredFps = defaultPreferredFps;
     powerProtectionEnabled = defaultPowerProtectionEnabled;
     powerThreshold = defaultPowerThreshold;
+    themeMode = defaultThemeMode;
     _file = null;
   }
+
+  @visibleForTesting
+  static AppThemeMode parseThemeMode(Object? value) =>
+      AppThemeMode.values.firstWhere(
+        (mode) => mode.name == value,
+        orElse: () => defaultThemeMode,
+      );
 
   static int _normalizeFps(int v) => fpsOptions.contains(v) ? v : defaultPreferredFps;
 
@@ -185,3 +203,6 @@ class AppSettings extends ChangeNotifier {
   static bool _readBool(Map<String, dynamic> m, String key, bool fallback) =>
       m[key] as bool? ?? fallback;
 }
+
+/// 外观模式：跟随系统、浅色、深色。
+enum AppThemeMode { system, light, dark }

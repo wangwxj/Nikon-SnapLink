@@ -38,6 +38,8 @@ class WatermarkCanvasPainter extends CustomPainter {
 
   /// 水印字体 (null = 各文字保持模板原生字体)
   final String? fontFamily;
+  final int quarterTurns;
+  final bool mirrorX;
 
   WatermarkCanvasPainter({
     required this.image,
@@ -51,6 +53,8 @@ class WatermarkCanvasPainter extends CustomPainter {
     this.cardDark = false,
     this.textDark = false,
     this.fontFamily,
+    this.quarterTurns = 0,
+    this.mirrorX = false,
   });
 
   /// 计算在给定源图尺寸与模板下的目标排版画布尺寸与图片放置位置
@@ -171,7 +175,10 @@ class WatermarkCanvasPainter extends CustomPainter {
 
   /// 绘制实际图像与完整水印排版
   void _paintFullComposite(Canvas canvas, Size size, ui.Image img) {
-    final layout = computeLayout(img.width.toDouble(), img.height.toDouble(), template, spacingScale);
+    final rotated = quarterTurns % 2 != 0;
+    final srcW = rotated ? img.height.toDouble() : img.width.toDouble();
+    final srcH = rotated ? img.width.toDouble() : img.height.toDouble();
+    final layout = computeLayout(srcW, srcH, template, spacingScale);
     // contain 适配：画布与排版比例不一致时整体缩放居中，不裁切、不加装饰底 (所见即所得)
     final scaleRatio = math.min(size.width / layout.totalWidth, size.height / layout.totalHeight);
     final offsetX = (size.width - layout.totalWidth * scaleRatio) / 2.0;
@@ -223,12 +230,23 @@ class WatermarkCanvasPainter extends CustomPainter {
       filterIntensity: filterIntensity,
       adjustments: adjustments,
     );
-    canvas.drawImageRect(
-      img,
-      Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
-      dstRect,
-      paint,
-    );
+    final srcRect = Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble());
+    final turns = quarterTurns % 4;
+    if (turns == 0 && !mirrorX) {
+      canvas.drawImageRect(img, srcRect, dstRect, paint);
+    } else {
+      canvas.save();
+      canvas.translate(dstRect.center.dx, dstRect.center.dy);
+      if (mirrorX) canvas.scale(-1, 1);
+      canvas.rotate(turns * math.pi / 2);
+      final local = Rect.fromCenter(
+        center: Offset.zero,
+        width: turns.isOdd ? dstRect.height : dstRect.width,
+        height: turns.isOdd ? dstRect.width : dstRect.height,
+      );
+      canvas.drawImageRect(img, srcRect, local, paint);
+      canvas.restore();
+    }
 
     // 绘制暗角
     if (adjustments.vignette.abs() >= 1.0) {

@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/network_config.dart';
+import '../../core/utils/progressive_jpeg.dart';
 import '../../core/utils/lru_image_cache.dart';
 import '../../core/utils/exif_helper.dart';
 import '../../engine/transfer/download_manager.dart';
@@ -139,7 +141,7 @@ Future<Uint8List?> fetchFullPhotoBytesWithDialog(
         return AlertDialog(
           backgroundColor: SnapColors.cardElevated,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
+          title: Row(
             children: [
               Icon(Icons.hd, color: SnapColors.primary, size: 22),
               SizedBox(width: 8),
@@ -155,13 +157,13 @@ Future<Uint8List?> fetchFullPhotoBytesWithDialog(
               LinearProgressIndicator(
                 value: downloadProgress > 0 ? downloadProgress : null,
                 backgroundColor: Colors.white12,
-                valueColor: const AlwaysStoppedAnimation(SnapColors.primary),
+                valueColor: AlwaysStoppedAnimation(SnapColors.primary),
               ),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${(downloadProgress * 100).toStringAsFixed(0)}%', style: const TextStyle(color: SnapColors.primary, fontSize: 12, fontFamily: 'monospace')),
+                  Text('${(downloadProgress * 100).toStringAsFixed(0)}%', style: TextStyle(color: SnapColors.primary, fontSize: 12, fontFamily: 'monospace')),
                   Text(item.fileName, style: const TextStyle(color: Colors.white38, fontSize: 11)),
                 ],
               ),
@@ -736,20 +738,20 @@ class GalleryScreenState extends State<GalleryScreen> {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white24,
+                  color: SnapColors.borderLight,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               '选择导出格式',
               style: TextStyle(color: SnapColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 6),
             Text(
               '选中的 $groupCount 张照片中包含 RAW + JPEG 双格式照片，请选择导出方式：',
-              style: const TextStyle(color: SnapColors.textSecondary, fontSize: 13),
+              style: TextStyle(color: SnapColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 18),
 
@@ -764,7 +766,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: SnapColors.primary.withAlpha(120), width: 1),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.collections, color: SnapColors.primary, size: 22),
                     SizedBox(width: 12),
@@ -778,7 +780,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                         ],
                       ),
                     ),
-                    Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white38),
+                    Icon(Icons.arrow_forward_ios, size: 14, color: SnapColors.textTertiary),
                   ],
                 ),
               ),
@@ -796,7 +798,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: SnapColors.border, width: 0.8),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.image, color: Color(0xFF66BB6A), size: 22),
                     SizedBox(width: 12),
@@ -810,7 +812,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                         ],
                       ),
                     ),
-                    Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white38),
+                    Icon(Icons.arrow_forward_ios, size: 14, color: SnapColors.textTertiary),
                   ],
                 ),
               ),
@@ -866,7 +868,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                   return AlertDialog(
                     backgroundColor: SnapColors.cardElevated,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    title: const Row(
+                    title: Row(
                       children: [
                         SizedBox(
                           width: 20,
@@ -881,7 +883,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           '通信通道独占中，已自动阻止其他操作以防止 Socket 冲突。',
                           style: TextStyle(color: SnapColors.textSecondary, fontSize: 11),
                         ),
@@ -895,13 +897,13 @@ class GalleryScreenState extends State<GalleryScreen> {
                               Expanded(
                                 child: Text(
                                   task.fileItem.fileName,
-                                  style: const TextStyle(color: SnapColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
+                                  style: TextStyle(color: SnapColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               Text(
                                 '${(currentTaskProgress * 100).toStringAsFixed(0)}%',
-                                style: const TextStyle(color: SnapColors.primary, fontSize: 12, fontFamily: 'monospace'),
+                                style: TextStyle(color: SnapColors.primary, fontSize: 12, fontFamily: 'monospace'),
                               ),
                             ],
                           ),
@@ -909,13 +911,13 @@ class GalleryScreenState extends State<GalleryScreen> {
                           LinearProgressIndicator(
                             value: currentTaskProgress,
                             backgroundColor: SnapColors.border,
-                            valueColor: const AlwaysStoppedAnimation(SnapColors.primary),
+                            valueColor: AlwaysStoppedAnimation(SnapColors.primary),
                             minHeight: 4,
                           ),
                           const SizedBox(height: 4),
                           Text(
                             '单文件大小: ${task.fileItem.sizeFormatted}',
-                            style: const TextStyle(color: SnapColors.textTertiary, fontSize: 10),
+                            style: TextStyle(color: SnapColors.textTertiary, fontSize: 10),
                           ),
                           const SizedBox(height: 14),
                         ],
@@ -926,7 +928,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                           children: [
                             Text(
                               '批次进度: 第 ${completedInBatch + 1} / ${files.length} 张',
-                              style: const TextStyle(color: SnapColors.textPrimary, fontSize: 12),
+                              style: TextStyle(color: SnapColors.textPrimary, fontSize: 12),
                             ),
                             Text(
                               '${(batchProgress * 100).toStringAsFixed(0)}%',
@@ -942,7 +944,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                           minHeight: 3,
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           '保存路径: /DCIM/SnapLink (相册可见)',
                           style: TextStyle(color: SnapColors.textTertiary, fontSize: 10),
                         ),
@@ -954,7 +956,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                           dm.cancelAll();
                           Navigator.pop(dialogCtx);
                         },
-                        child: const Text('取消剩余任务', style: TextStyle(color: SnapColors.danger, fontSize: 12)),
+                        child: Text('取消剩余任务', style: TextStyle(color: SnapColors.danger, fontSize: 12)),
                       ),
                     ],
                   );
@@ -1081,7 +1083,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.sync_alt, color: SnapColors.success, size: 14),
+                      Icon(Icons.sync_alt, color: SnapColors.success, size: 14),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
@@ -1107,7 +1109,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                 child: (!isConnected || _activeTab == 1)
                     ? _buildHistoryExportView(crossAxisCount)
                     : _isLoading
-                        ? const Center(
+                        ? Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -1330,9 +1332,9 @@ class GalleryScreenState extends State<GalleryScreen> {
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF111216),
+        color: SnapColors.card,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF262832), width: 1.2),
+        border: Border.all(color: SnapColors.border, width: 1.2),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(160),
@@ -1404,7 +1406,7 @@ class GalleryScreenState extends State<GalleryScreen> {
   /// 历史导出 (本地相册已下载照片) 视图
   Widget _buildHistoryExportView(int crossAxisCount) {
     if (_historyManager.isLoading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1424,11 +1426,11 @@ class GalleryScreenState extends State<GalleryScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.photo_library_outlined, size: 52, color: SnapColors.textTertiary),
+              Icon(Icons.photo_library_outlined, size: 52, color: SnapColors.textTertiary),
               const SizedBox(height: 14),
-              const Text('本地暂无已导出的照片', style: TextStyle(color: SnapColors.textSecondary, fontSize: 14, fontWeight: FontWeight.bold)),
+              Text('本地暂无已导出的照片', style: TextStyle(color: SnapColors.textSecondary, fontSize: 14, fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 '当您连接相机并导出照片，或在水印工坊制作并保存图片后，\n无需连接相机，均可在此随时查看、加水印与分享！',
                 style: TextStyle(color: SnapColors.textTertiary, fontSize: 12, height: 1.5),
                 textAlign: TextAlign.center,
@@ -1454,16 +1456,16 @@ class GalleryScreenState extends State<GalleryScreen> {
           color: SnapColors.surface,
           child: Row(
             children: [
-              const Icon(Icons.folder_outlined, size: 14, color: SnapColors.primary),
+              Icon(Icons.folder_outlined, size: 14, color: SnapColors.primary),
               const SizedBox(width: 6),
               Text(
                 '保存路径: /DCIM/SnapLink · 共 ${items.length} 张已导出',
-                style: const TextStyle(color: SnapColors.textSecondary, fontSize: 11),
+                style: TextStyle(color: SnapColors.textSecondary, fontSize: 11),
               ),
               const Spacer(),
               InkWell(
                 onTap: () => _historyManager.refresh(),
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.refresh, size: 13, color: SnapColors.primary),
                     SizedBox(width: 2),
@@ -1583,12 +1585,12 @@ class GalleryScreenState extends State<GalleryScreen> {
                     item.fileName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: SnapColors.textPrimary, fontSize: 10.5, fontWeight: FontWeight.bold),
+                    style: TextStyle(color: SnapColors.textPrimary, fontSize: 10.5, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 1),
                   Text(
                     item.sizeFormatted,
-                    style: const TextStyle(color: SnapColors.textTertiary, fontSize: 8.5, fontFamily: 'monospace'),
+                    style: TextStyle(color: SnapColors.textTertiary, fontSize: 8.5, fontFamily: 'monospace'),
                   ),
                 ],
               ),
@@ -1744,14 +1746,22 @@ class GalleryScreenState extends State<GalleryScreen> {
     if (!mounted) return;
     final cameraName = widget.driver.cameraModel.isNotEmpty ? widget.driver.cameraModel : 'Z50_2';
 
-    // 原图渐进加载：先展示缩略图，后台拉取原图后自动升级画质
+    // 三级渐进预览：内存全图 > 35% 低清片段(容错解码) > 相机缩略图
     final cachedFull = _fullCache[primaryKey];
-    final previewState = ValueNotifier<({Uint8List? bytes, bool done})>(
-      (bytes: cachedFull, done: cachedFull != null && cachedFull.isNotEmpty),
+    final previewState = ValueNotifier<({Uint8List? bytes, ui.Image? progressive, bool done})>(
+      (
+        bytes: cachedFull,
+        progressive: null,
+        done: cachedFull != null && cachedFull.isNotEmpty,
+      ),
     );
     if (!previewState.value.done) {
+      // 阶段 1：只取前 35% 字节，image 包容错解码后立刻上屏
+      _loadProgressivePreview(group.primaryItem, previewState);
+      // 阶段 2：后台继续拉完整原图，到达后无损升级画质
       fetchFullPhotoBytesSilent(widget.driver, _fullCache, group.primaryItem).then((b) {
-        previewState.value = (bytes: b, done: true);
+        final full = (b != null && b.isNotEmpty) ? b : null;
+        previewState.value = (bytes: full, progressive: previewState.value.progressive, done: true);
       });
     }
 
@@ -1804,43 +1814,40 @@ class GalleryScreenState extends State<GalleryScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // 照片预览区域 (缩略图秒出，原图加载完成后自动升级画质)
+                // 照片预览区域：按照片真实比例自适应，避免固定框留黑边；
+                // 三级画质：完整原图 > 35% 渐进低清 > 相机缩略图
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    height: 280,
+                  child: SizedBox(
+                    height: _previewHeight(group.primaryItem),
                     width: double.infinity,
-                    color: Colors.black,
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        ValueListenableBuilder<({Uint8List? bytes, bool done})>(
+                        ValueListenableBuilder<({Uint8List? bytes, ui.Image? progressive, bool done})>(
                           valueListenable: previewState,
                           builder: (context, state, _) {
                             if (state.bytes != null && state.bytes!.isNotEmpty) {
-                              return Image.memory(
-                                state.bytes!,
+                              return _buildCameraImage(state.bytes!, group.primaryItem, BoxFit.contain);
+                            }
+                            if (state.progressive != null) {
+                              // 渐进片段已在 image 包内烘焙 EXIF 方向，直接绘制
+                              return RawImage(
+                                image: state.progressive,
                                 fit: BoxFit.contain,
                                 width: double.infinity,
                                 height: double.infinity,
-                                errorBuilder: (_, __, ___) => _buildFallbackIcon(group.primaryItem),
                               );
                             }
                             final thumb = _thumbCache[primaryKey];
                             if (thumb != null && thumb.isNotEmpty) {
-                              return Image.memory(
-                                thumb,
-                                fit: BoxFit.contain,
-                                width: double.infinity,
-                                height: double.infinity,
-                                errorBuilder: (_, __, ___) => _buildFallbackIcon(group.primaryItem),
-                              );
+                              return _buildCameraImage(thumb, group.primaryItem, BoxFit.contain);
                             }
-                            return _buildThumbnailImage(group.primaryItem);
+                            return _buildThumbnailImage(group.primaryItem, fit: BoxFit.contain);
                           },
                         ),
                         // 原图拉取进度角标
-                        ValueListenableBuilder<({Uint8List? bytes, bool done})>(
+                        ValueListenableBuilder<({Uint8List? bytes, ui.Image? progressive, bool done})>(
                           valueListenable: previewState,
                           builder: (context, state, _) {
                             if (state.done) return const SizedBox.shrink();
@@ -1853,7 +1860,7 @@ class GalleryScreenState extends State<GalleryScreen> {
                                   color: Colors.black.withAlpha(160),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: const Row(
+                                child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     SizedBox(
@@ -1861,8 +1868,9 @@ class GalleryScreenState extends State<GalleryScreen> {
                                       height: 10,
                                       child: CircularProgressIndicator(strokeWidth: 1.6, color: SnapColors.primary),
                                     ),
-                                    SizedBox(width: 6),
-                                    Text('原图加载中…', style: TextStyle(color: Colors.white70, fontSize: 9)),
+                                    const SizedBox(width: 6),
+                                    Text(state.progressive != null ? '低清预览·原图加载中…' : '原图加载中…',
+                                        style: TextStyle(color: SnapColors.textSecondary, fontSize: 9)),
                                   ],
                                 ),
                               ),
@@ -2069,37 +2077,24 @@ class GalleryScreenState extends State<GalleryScreen> {
     );
   }
 
-  Widget _buildThumbnailImage(CameraFileItem file) {
+  /// 相机缩略图。相册网格用 [BoxFit.cover] 填满正方形格子避免黑边；
+  /// 方向完全交给解码器处理，避免对已应用 EXIF 的缩略图二次旋转。
+  Widget _buildThumbnailImage(CameraFileItem file, {BoxFit fit = BoxFit.cover}) {
     final cacheKey = cameraCacheKey(file.storageId, file.handle);
-    if (_thumbCache.containsKey(cacheKey)) {
-      final cachedBytes = _thumbCache[cacheKey]!;
-      if (cachedBytes.isNotEmpty) {
-        return Image.memory(
-          cachedBytes,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          errorBuilder: (_, __, ___) => _buildFallbackIcon(file),
-        );
-      }
+    final cached = _thumbCache[cacheKey];
+    if (cached != null && cached.isNotEmpty) {
+      return _buildCameraImage(cached, file, fit);
     }
-
     return FutureBuilder<Uint8List>(
       future: _resolveThumb(file), // 内存 > 磁盘缓存 > 相机 (in-flight 去重)
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.done &&
             snapshot.hasData &&
             snapshot.data!.isNotEmpty) {
-          return Image.memory(
-            snapshot.data!,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-            errorBuilder: (_, __, ___) => _buildFallbackIcon(file),
-          );
+          return _buildCameraImage(snapshot.data!, file, fit);
         }
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
+          return Center(
             child: SizedBox(
               width: 18,
               height: 18,
@@ -2110,6 +2105,51 @@ class GalleryScreenState extends State<GalleryScreen> {
         return _buildFallbackIcon(file);
       },
     );
+  }
+
+  /// 统一图片渲染入口。
+  ///
+  /// Flutter/Skia 的 `Image.memory` 已经应用 JPEG 的 EXIF Orientation；
+  /// 相机 GetThumb 若自身不带 EXIF，也不能拿原图方向反推缩略图，
+  /// 否则会给已经摆正的竖拍缩略图叠加一次旋转（表现为颠倒/歪斜）。
+  Widget _buildCameraImage(Uint8List bytes, CameraFileItem file, BoxFit fit) {
+    return Image.memory(
+      bytes,
+      fit: fit,
+      width: double.infinity,
+      height: double.infinity,
+      gaplessPlayback: true,
+      errorBuilder: (_, __, ___) => _buildFallbackIcon(file),
+    );
+  }
+
+  /// 预览框高度：按照片宽高比自适应，最多占屏高的 46%，横竖图都无黑边。
+  double _previewHeight(CameraFileItem file) {
+    final w = file.pixelWidth > 0 ? file.pixelWidth : 3;
+    final h = file.pixelHeight > 0 ? file.pixelHeight : 2;
+    final maxH = MediaQuery.of(context).size.height * 0.46;
+    final aspect = w / h;
+    final width = MediaQuery.of(context).size.width - 32;
+    return (width / aspect).clamp(180.0, maxH).toDouble();
+  }
+
+  /// 阶段 1：仅拉取前 35% 字节，用 image 包容错解码出低清首帧。
+  void _loadProgressivePreview(
+    CameraFileItem file,
+    ValueNotifier<({Uint8List? bytes, ui.Image? progressive, bool done})> state,
+  ) async {
+    if (!widget.driver.isConnected || file.size <= 0) return;
+    final want = (file.size * ProgressiveJpeg.defaultFraction).round();
+    if (want < 4096) return;
+    try {
+      final partial = await widget.driver.downloadPartialObject(file.handle, 0, want);
+      if (partial.length < 4096) return;
+      final decoded = await ProgressiveJpeg.decodeLenient(partial);
+      if (decoded == null) return;
+      // 若完整原图已在阶段 2 到达则不再回退画质
+      if (state.value.bytes != null && state.value.bytes!.isNotEmpty) return;
+      state.value = (bytes: null, progressive: decoded, done: state.value.done);
+    } catch (_) {}
   }
 
   Widget _buildFallbackIcon(CameraFileItem file) {
@@ -2228,7 +2268,7 @@ class _FullScreenPhotoViewerState extends State<FullScreenPhotoViewer> {
             gaplessPlayback: true,
             errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white38, size: 64),
           ),
-          const Positioned(
+          Positioned(
             top: 10,
             right: 10,
             child: SizedBox(
@@ -2248,7 +2288,7 @@ class _FullScreenPhotoViewerState extends State<FullScreenPhotoViewer> {
           widget.thumbCache[cameraCacheKey(file.storageId, file.handle)] = snap.data!;
           return Image.memory(snap.data!, fit: fit);
         }
-        return const Center(
+        return Center(
           child: SizedBox(
             width: 28,
             height: 28,

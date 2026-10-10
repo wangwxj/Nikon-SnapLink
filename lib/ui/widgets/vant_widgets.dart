@@ -35,7 +35,7 @@ class VantCell extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           border: showDivider
-              ? const Border(bottom: BorderSide(color: SnapColors.border, width: 0.6))
+              ? Border(bottom: BorderSide(color: SnapColors.border, width: 0.6))
               : null,
         ),
         child: Row(
@@ -54,7 +54,7 @@ class VantCell extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: SnapColors.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -64,7 +64,7 @@ class VantCell extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       label!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: SnapColors.textSecondary,
                         fontSize: 11,
                       ),
@@ -78,14 +78,14 @@ class VantCell extends StatelessWidget {
             else if (value != null)
               Text(
                 value!,
-                style: const TextStyle(
+                style: TextStyle(
                   color: SnapColors.textSecondary,
                   fontSize: 13,
                 ),
               ),
             if (isLink) ...[
               const SizedBox(width: 6),
-              const Icon(Icons.arrow_forward_ios, size: 12, color: SnapColors.textTertiary),
+              Icon(Icons.arrow_forward_ios, size: 12, color: SnapColors.textTertiary),
             ],
           ],
         ),
@@ -115,7 +115,7 @@ class VantCellGroup extends StatelessWidget {
             padding: const EdgeInsets.only(left: 16, top: 16, bottom: 8),
             child: Text(
               title!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: SnapColors.textTertiary,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
