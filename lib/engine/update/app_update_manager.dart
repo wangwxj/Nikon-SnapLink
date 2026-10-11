@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import '../../core/constants/colors.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../protocol/camera_native_bridge.dart';
 
@@ -18,7 +19,7 @@ class AppReleaseInfo {
   final int? fileSize;
   final DateTime? publishedAt;
 
-  const AppReleaseInfo({
+  AppReleaseInfo({
     required this.tagName,
     required this.versionName,
     required this.title,
@@ -111,14 +112,14 @@ class AppReleaseInfo {
 class AppUpdateManager {
   AppUpdateManager._();
 
-  static const String currentVersion = '1.2.0';
-  static const int currentVersionCode = 3;
+  static String currentVersion = '1.3.0';
+  static int currentVersionCode = 4;
 
-  static const String giteeApiUrl = 'https://gitee.com/api/v5/repos/lyb82ndkkkl/Nikon-SnapLink/releases/latest';
-  static const String githubApiUrl = 'https://api.github.com/repos/lyb82ndkf-lab/Nikon-SnapLink/releases/latest';
+  static String giteeApiUrl = 'https://gitee.com/api/v5/repos/lyb82ndkkkl/Nikon-SnapLink/releases/latest';
+  static String githubApiUrl = 'https://api.github.com/repos/lyb82ndkf-lab/Nikon-SnapLink/releases/latest';
 
-  static const String giteeWebUrl = 'https://gitee.com/lyb82ndkkkl/Nikon-SnapLink/releases';
-  static const String githubWebUrl = 'https://github.com/lyb82ndkf-lab/Nikon-SnapLink/releases';
+  static String giteeWebUrl = 'https://gitee.com/lyb82ndkkkl/Nikon-SnapLink/releases';
+  static String githubWebUrl = 'https://github.com/lyb82ndkf-lab/Nikon-SnapLink/releases';
 
   /// 语义化版本号比对：判断 remoteVersion 是否严格大于 currentVersion
   /// 例如：'1.2.0' > '1.1.0' (true), '1.1.0' > '1.1.0' (false), '1.0.0' > '1.1.0' (false)
@@ -420,7 +421,7 @@ class AppUpdateManager {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const _LoadingCheckDialog(),
+      builder: (_) => _LoadingCheckDialog(),
     );
 
     try {
@@ -475,34 +476,34 @@ class AppUpdateManager {
   }) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF242424),
+      builder: (context) => AlertDialog(
+        backgroundColor: SnapColors.of(context).card,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           title,
-          style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+          style: TextStyle(color: SnapColors.of(context).textPrimary, fontSize: 17, fontWeight: FontWeight.bold),
         ),
         content: Text(
           message,
-          style: const TextStyle(color: Color(0xFFB0B0B0), fontSize: 14, height: 1.5),
+          style: TextStyle(color: SnapColors.of(context).textSecondary, fontSize: 14, height: 1.5),
         ),
         actions: [
           if (showBrowserButton && webUrl != null)
             TextButton(
               onPressed: () {
-                Navigator.of(ctx).pop();
+                Navigator.of(context).pop();
                 CameraNativeBridge.openUrlInBrowser(webUrl);
               },
-              child: const Text('打开官网', style: TextStyle(color: Color(0xFFD4AF37))),
+              child: Text('打开官网', style: TextStyle(color: SnapColors.of(context).primary)),
             ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD4AF37),
-              foregroundColor: Colors.black,
+              backgroundColor: SnapColors.of(context).primary,
+              foregroundColor: SnapColors.of(context).textInverse,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('确定', style: TextStyle(fontWeight: FontWeight.bold)),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('确定', style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -517,15 +518,15 @@ class CancelToken {
 
 /// 检查更新加载中弹窗
 class _LoadingCheckDialog extends StatelessWidget {
-  const _LoadingCheckDialog();
+  _LoadingCheckDialog();
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: const Color(0xFF242424),
+      backgroundColor: SnapColors.of(context).card,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -534,13 +535,13 @@ class _LoadingCheckDialog extends StatelessWidget {
               height: 26,
               child: CircularProgressIndicator(
                 strokeWidth: 2.5,
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
+                valueColor: AlwaysStoppedAnimation<Color>(SnapColors.of(context).primary),
               ),
             ),
-            SizedBox(width: 18),
+            const SizedBox(width: 18),
             Text(
               '正在检查新版本...',
-              style: TextStyle(color: Colors.white, fontSize: 15),
+              style: TextStyle(color: SnapColors.of(context).textPrimary, fontSize: 15),
             ),
           ],
         ),
@@ -554,7 +555,7 @@ class AppUpdateDialog extends StatefulWidget {
   final AppReleaseInfo releaseInfo;
   final bool isManualCheck;
 
-  const AppUpdateDialog({
+  AppUpdateDialog({
     super.key,
     required this.releaseInfo,
     this.isManualCheck = false,
@@ -640,7 +641,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
           backgroundColor: Colors.redAccent.shade700,
           action: SnackBarAction(
             label: '浏览器下载',
-            textColor: Colors.white,
+            textColor: SnapColors.of(context).textPrimary,
             onPressed: () => CameraNativeBridge.openUrlInBrowser(widget.releaseInfo.downloadUrl),
           ),
         ),
@@ -655,7 +656,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('已跳过版本 v${widget.releaseInfo.versionName}，后续启动不再提醒'),
-        backgroundColor: const Color(0xFF333333),
+        backgroundColor: SnapColors.of(context).card,
         duration: const Duration(seconds: 2),
       ),
     );
@@ -674,12 +675,12 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
         child: Container(
           constraints: const BoxConstraints(maxWidth: 420),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E1E1E),
+            color: SnapColors.of(context).card,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF3A3A3A), width: 1),
+            border: Border.all(color: SnapColors.of(context).border, width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withAlpha(160),
+                color: Colors.black.withAlpha(Theme.of(context).brightness == Brightness.light ? 25 : 160),
                 blurRadius: 28,
                 offset: const Offset(0, 10),
               ),
@@ -692,13 +693,13 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
               // 头部色彩 Banner 与标题栏
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Color(0xFF2C2417), Color(0xFF1E1E1E)],
+                    colors: [SnapColors.of(context).card, SnapColors.of(context).card],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                   ),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: const BorderRadius.vertical(top: const Radius.circular(20)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -707,23 +708,23 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                       width: 46,
                       height: 46,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFFD54F), Color(0xFFD4AF37)],
+                        gradient: LinearGradient(
+                          colors: [SnapColors.of(context).primary, SnapColors.of(context).primary],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFD4AF37).withAlpha(80),
+                            color: SnapColors.of(context).primary.withAlpha(80),
                             blurRadius: 10,
                             offset: const Offset(0, 3),
                           ),
                         ],
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.system_update_alt_rounded,
-                        color: Colors.black87,
+                        color: SnapColors.of(context).textInverse,
                         size: 26,
                       ),
                     ),
@@ -736,8 +737,8 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                             children: [
                               Text(
                                 '发现新版本',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: SnapColors.of(context).textPrimary,
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 0.3,
@@ -747,13 +748,13 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: isGitee ? const Color(0xFFC71D23) : const Color(0xFF24292E),
+                                  color: SnapColors.of(context).cardElevated,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   isGitee ? 'Gitee 推荐源' : 'GitHub 源',
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: SnapColors.of(context).textPrimary,
                                     fontSize: 10,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -765,14 +766,14 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF2A2A2A),
+                              color: SnapColors.of(context).card,
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFF444444)),
+                              border: Border.all(color: SnapColors.of(context).border),
                             ),
                             child: Text(
                               'v${AppUpdateManager.currentVersion}  →  v${info.versionName}',
-                              style: const TextStyle(
-                                color: Color(0xFFFFD54F),
+                              style: TextStyle(
+                                color: SnapColors.of(context).primary,
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                                 fontFamily: 'monospace',
@@ -794,8 +795,8 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                   children: [
                     Text(
                       info.title.isNotEmpty ? info.title : 'SnapLink v${info.versionName}',
-                      style: const TextStyle(
-                        color: Color(0xFFE8E8E8),
+                      style: TextStyle(
+                        color: SnapColors.of(context).textSecondary,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -805,16 +806,16 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                       constraints: const BoxConstraints(maxHeight: 180),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF141414),
+                        color: SnapColors.of(context).card,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF2A2A2A)),
+                        border: Border.all(color: SnapColors.of(context).card),
                       ),
                       child: SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
                         child: Text(
                           info.changelog.isNotEmpty ? info.changelog : '修复已知问题，优化整体连接与水印渲染稳定性。',
-                          style: const TextStyle(
-                            color: Color(0xFFAAAAAA),
+                          style: TextStyle(
+                            color: SnapColors.of(context).textSecondary,
                             fontSize: 13,
                             height: 1.5,
                           ),
@@ -825,7 +826,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                       const SizedBox(height: 8),
                       Text(
                         '安装包大小: ${AppUpdateManager.formatBytes(info.fileSize!)}',
-                        style: const TextStyle(color: Color(0xFF777777), fontSize: 12),
+                        style: TextStyle(color: SnapColors.of(context).textSecondary, fontSize: 12),
                       ),
                     ],
                   ],
@@ -839,9 +840,9 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                   child: Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF181818),
+                      color: SnapColors.of(context).card,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF2C2C2C)),
+                      border: Border.all(color: SnapColors.of(context).border),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -851,8 +852,8 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                           children: [
                             Text(
                               '正在下载: ${(_downloadProgress * 100).toStringAsFixed(1)}%',
-                              style: const TextStyle(
-                                color: Color(0xFFFFD54F),
+                              style: TextStyle(
+                                color: SnapColors.of(context).primary,
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -860,7 +861,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                             Text(
                               _speedText,
                               style: const TextStyle(
-                                color: Color(0xFF9E9E9E),
+                                color: const Color(0xFF9E9E9E),
                                 fontSize: 12,
                                 fontFamily: 'monospace',
                               ),
@@ -873,8 +874,8 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                           child: LinearProgressIndicator(
                             value: _downloadProgress > 0 ? _downloadProgress : null,
                             minHeight: 6,
-                            backgroundColor: const Color(0xFF2C2C2C),
-                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
+                            backgroundColor: SnapColors.of(context).border,
+                            valueColor: AlwaysStoppedAnimation<Color>(SnapColors.of(context).primary),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -885,15 +886,15 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                               _totalBytes > 0
                                   ? '${AppUpdateManager.formatBytes(_receivedBytes)} / ${AppUpdateManager.formatBytes(_totalBytes)}'
                                   : AppUpdateManager.formatBytes(_receivedBytes),
-                              style: const TextStyle(color: Color(0xFF757575), fontSize: 11),
+                              style: const TextStyle(color: const Color(0xFF757575), fontSize: 11),
                             ),
                             InkWell(
                               onTap: _cancelDownload,
                               child: const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                child: Text(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                child: const Text(
                                   '取消',
-                                  style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
                                 ),
                               ),
                             ),
@@ -926,7 +927,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                           foregroundColor: const Color(0xFF757575),
                           padding: const EdgeInsets.symmetric(horizontal: 10),
                         ),
-                        child: const Text('跳过该版', style: TextStyle(fontSize: 13)),
+                        child: const Text('跳过该版', style: const TextStyle(fontSize: 13)),
                       ),
 
                     // 稍后提醒 / 取消
@@ -934,10 +935,10 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
                         style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFAAAAAA),
+                          foregroundColor: SnapColors.of(context).textSecondary,
                           padding: const EdgeInsets.symmetric(horizontal: 10),
                         ),
-                        child: const Text('稍后', style: TextStyle(fontSize: 13)),
+                        child: const Text('稍后', style: const TextStyle(fontSize: 13)),
                       ),
 
                     const Spacer(),
@@ -948,10 +949,10 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                         ElevatedButton.icon(
                           onPressed: _installDownloadedApk,
                           icon: const Icon(Icons.install_mobile_rounded, size: 18),
-                          label: const Text('立即安装', style: TextStyle(fontWeight: FontWeight.bold)),
+                          label: const Text('立即安装', style: const TextStyle(fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD4AF37),
-                            foregroundColor: Colors.black,
+                            backgroundColor: SnapColors.of(context).primary,
+                            foregroundColor: SnapColors.of(context).textInverse,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                           ),
@@ -960,10 +961,10 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                         ElevatedButton.icon(
                           onPressed: _startDownload,
                           icon: const Icon(Icons.download_rounded, size: 18),
-                          label: const Text('下载并安装', style: TextStyle(fontWeight: FontWeight.bold)),
+                          label: const Text('下载并安装', style: const TextStyle(fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD4AF37),
-                            foregroundColor: Colors.black,
+                            backgroundColor: SnapColors.of(context).primary,
+                            foregroundColor: SnapColors.of(context).textInverse,
                             elevation: 3,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
@@ -973,7 +974,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
 
                     // 备用浏览器下载图标
                     IconButton(
-                      icon: const Icon(Icons.open_in_browser, color: Color(0xFF888888), size: 20),
+                      icon: const Icon(Icons.open_in_browser, color: const Color(0xFF888888), size: 20),
                       tooltip: '在浏览器中打开下载',
                       onPressed: () {
                         CameraNativeBridge.openUrlInBrowser(info.downloadUrl);

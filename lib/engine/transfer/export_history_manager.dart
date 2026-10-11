@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../protocol/camera_native_bridge.dart';
 
 /// 已导出到本地相册的文件模型
 class ExportedMediaItem {
@@ -10,13 +12,25 @@ class ExportedMediaItem {
   final int size;
   final DateTime modifiedTime;
 
+  /// MediaStore 内容 URI（Android 10+）或旧系统绝对路径；扫描得到的项可能为 null。
+  final String? mediaUri;
+
+  /// 是否由编辑器“覆盖原图”写回（用于已导出分类角标）。
+  final bool isOverwritten;
+
   ExportedMediaItem({
     required this.file,
     required this.fileName,
     required this.baseName,
     required this.size,
     required this.modifiedTime,
+    this.mediaUri,
+    this.isOverwritten = false,
   });
+
+  /// 是否由编辑器“另存为新文件”产生（文件名带 _edit 后缀）。
+  bool get isSavedAsCopy =>
+      RegExp(r'_EDIT(_\d+)?$').hasMatch(baseName.toUpperCase());
 
   bool get isJpeg {
     final lower = fileName.toLowerCase();
@@ -70,6 +84,46 @@ class ExportHistoryManager extends ChangeNotifier {
   final Set<String> _exportedBaseNames = {};
   bool _isLoading = false;
 
+  /// 被编辑器“覆盖原图”写回的文件名集合（持久化，保证重启后角标仍在）。
+  final Set<String> _overwrittenNames = {};
+  bool _editedIndexLoaded = false;
+  final Map<String, Future<File>> _localReads = {};
+  final Map<String, String> _sources = {};
+
+  static String sourceKey(int storageId, String name, int size, String captured) =>
+      '$storageId|${name.toUpperCase()}|$size|$captured';
+
+  Future<void> recordSource(String key, String uri) async {
+    _sources[key] = uri;
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File('${dir.path}/downloaded_media.json');
+    final temp = File('${file.path}.tmp');
+    await temp.writeAsString(jsonEncode(_sources), flush: true);
+    await temp.rename(file.path);
+  }
+
+  Future<File> ensureLocalFile(ExportedMediaItem item) {
+    final key = item.mediaUri ?? item.file.path;
+    return _localReads.putIfAbsent(key, () async {
+      try {
+        if (item.mediaUri?.startsWith('content://') == true) {
+          final path = await CameraNativeBridge.materializeMedia(item.mediaUri!);
+          if (path == null) throw FileSystemException('本地照片已删除或无法读取', item.fileName);
+          final file = File(path);
+          if (!await file.exists() || await file.length() == 0) {
+            throw FileSystemException('本地照片为空', path);
+          }
+          return file;
+        }
+        final file = item.mediaUri != null ? File(item.mediaUri!) : item.file;
+        if (!await file.exists() || await file.length() == 0) {
+          throw FileSystemException('本地照片已删除或无法读取', file.path);
+        }
+        return file;
+      } finally { _localReads.remove(key); }
+    });
+  }
+
   List<ExportedMediaItem> get items => List.unmodifiable(_exportedItems);
   Set<String> get exportedBaseNames => Set.unmodifiable(_exportedBaseNames);
   bool get isLoading => _isLoading;
@@ -81,15 +135,28 @@ class ExportHistoryManager extends ChangeNotifier {
     return _exportedBaseNames.contains(clean);
   }
 
-  /// 根据文件名或基础名查找本地已导出的媒体项
-  ExportedMediaItem? findExportedItem(String fileName) {
-    final clean = _cleanBaseName(fileName);
-    for (final item in _exportedItems) {
-      if (item.baseName == clean || _cleanBaseName(item.fileName) == clean) {
-        return item;
-      }
+  ExportedMediaItem? findExportedItemByExactName(String fileName) => findExportedItem(fileName);
+
+  static bool _sameMedia(String? first,String? second) {
+    if(first==second) return true;
+    final a=Uri.tryParse(first ?? ''),b=Uri.tryParse(second ?? '');
+    if(a==null || b==null || a.scheme!='content' || b.scheme!='content' ||
+        a.authority!='media' || b.authority!='media' || a.pathSegments.length<3 || b.pathSegments.length<3) return false;
+    // Images/Video/Files 同一卷的同一个 _ID 是同一条媒体记录。
+    return a.pathSegments.first==b.pathSegments.first && a.pathSegments.last==b.pathSegments.last;
+  }
+
+  /// 有扩展名时只匹配同类型文件；不以 RAW 副本替代 JPG。
+  ExportedMediaItem? findExportedItem(String fileName, {String? sourceKey}) {
+    final upper = fileName.toUpperCase().trim();
+    final candidates = _exportedItems.where((e) => fileName.contains('.')
+        ? e.fileName.toUpperCase() == upper : e.baseName == _cleanBaseName(fileName)).toList();
+    final uri = sourceKey == null ? null : _sources[sourceKey];
+    if (uri != null) {
+      for (final item in candidates) { if (_sameMedia(item.mediaUri,uri)) return item; }
+      return null;
     }
-    return null;
+    return candidates.length == 1 ? candidates.single : null;
   }
 
   /// 归一化提取文件名主干 (如 DSC_0001.JPG -> DSC_0001)
@@ -106,6 +173,12 @@ class ExportHistoryManager extends ChangeNotifier {
   Future<void> refresh() async {
     _isLoading = true;
     notifyListeners();
+    await _ensureEditedIndexLoaded();
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final f = File('${dir.path}/downloaded_media.json');
+      if (await f.exists()) _sources.addAll(Map<String, String>.from(jsonDecode(await f.readAsString()) as Map));
+    } catch (_) {}
 
     final foundItems = <ExportedMediaItem>[];
     final foundBaseNames = <String>{};
@@ -114,6 +187,8 @@ class ExportHistoryManager extends ChangeNotifier {
       final targetDirs = <Directory>[
         Directory('/storage/emulated/0/DCIM/SnapLink'),
         Directory('/storage/emulated/0/Pictures/SnapLink'),
+        Directory('/storage/emulated/0/Movies/SnapLink'),
+        Directory('/storage/emulated/0/Download/SnapLink'),
       ];
 
       try {
@@ -129,6 +204,7 @@ class ExportHistoryManager extends ChangeNotifier {
       } catch (_) {}
 
       final seenPaths = <String>{};
+      final candidateNames = <String>[];
 
       for (final dir in targetDirs) {
         if (!await dir.exists()) continue;
@@ -152,6 +228,7 @@ class ExportHistoryManager extends ChangeNotifier {
                   lower.endsWith('.mov') ||
                   lower.endsWith('.mp4')) {
                 seenPaths.add(path);
+                candidateNames.add(name);
                 final stat = await entry.stat();
                 final base = _cleanBaseName(name);
 
@@ -161,6 +238,7 @@ class ExportHistoryManager extends ChangeNotifier {
                   baseName: base,
                   size: stat.size,
                   modifiedTime: stat.modified,
+                  isOverwritten: _overwrittenNames.contains(name.toUpperCase()),
                 ));
                 foundBaseNames.add(base);
               }
@@ -168,6 +246,27 @@ class ExportHistoryManager extends ChangeNotifier {
           }
         } catch (_) {}
       }
+
+      // MediaStore 是主索引，不依赖 Android 是否允许直接枚举公共路径。
+      try {
+        final rows = await CameraNativeBridge.listSavedMedia();
+        final names = rows.map((e) => (e['name'] as String).toUpperCase()).toSet();
+        foundItems.removeWhere((e) => names.contains(e.fileName.toUpperCase()) &&
+            e.file.path.startsWith('/storage/'));
+        for (final row in rows) {
+          final name = row['name'] as String;
+          final uri = row['uri'] as String;
+          final path = row['path'] as String?;
+          foundItems.add(ExportedMediaItem(
+            file: File(path?.isNotEmpty == true ? path! : uri),
+            fileName: name, baseName: _cleanBaseName(name), size: (row['size'] as num).toInt(),
+            modifiedTime: DateTime.fromMillisecondsSinceEpoch((row['modified'] as num).toInt()),
+            mediaUri: uri, isOverwritten: _overwrittenNames.contains(name.toUpperCase()),
+          ));
+        }
+      } catch (_) { /* 旧系统/权限受限时保留路径扫描结果。 */ }
+      foundBaseNames.clear();
+      foundBaseNames.addAll(foundItems.map((e) => e.baseName));
 
       // 按修改时间降序 (最新的在最前)
       foundItems.sort((a, b) => b.modifiedTime.compareTo(a.modifiedTime));
@@ -180,8 +279,8 @@ class ExportHistoryManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 当下载或导出单张新照片时快速注册
-  void registerExported(String fileName, [File? file]) {
+  /// 当下载或导出单张新照片时快速注册。mediaUri 为 MediaStore 返回的 Uri/路径。
+  void registerExported(String fileName, [File? file, String? mediaUri]) {
     final base = _cleanBaseName(fileName);
     _exportedBaseNames.add(base);
     if (file != null && file.existsSync()) {
@@ -189,23 +288,87 @@ class ExportHistoryManager extends ChangeNotifier {
       _exportedItems.insert(
         0,
         ExportedMediaItem(
-          file: file,
+          file: mediaUri != null ? File(mediaUri) : file,
           fileName: fileName,
           baseName: base,
           size: stat.size,
           modifiedTime: stat.modified,
+          mediaUri: mediaUri,
+          isOverwritten: _overwrittenNames.contains(fileName.toUpperCase()),
         ),
       );
     }
     notifyListeners();
   }
 
+  /// 编辑“覆盖原图”成功后调用：记录角标并刷新对应条目。
+  Future<void> markOverwritten(String fileName, File file, String? mediaUri) async {
+    final key = fileName.toUpperCase();
+    _overwrittenNames.add(key);
+    await _saveEditedIndex();
+    final index = _exportedItems.indexWhere((e) => e.fileName.toUpperCase() == key &&
+        (mediaUri == null || e.mediaUri == mediaUri));
+    if (index >= 0) {
+      final old = _exportedItems[index];
+      final stat = file.existsSync() ? file.statSync() : null;
+      _exportedItems[index] = ExportedMediaItem(
+        file: File(mediaUri ?? old.mediaUri ?? old.file.path),
+        fileName: old.fileName,
+        baseName: old.baseName,
+        size: stat?.size ?? old.size,
+        modifiedTime: stat?.modified ?? DateTime.now(),
+        mediaUri: mediaUri ?? old.mediaUri,
+        isOverwritten: true,
+      );
+    }
+    notifyListeners();
+  }
+
+  /// 编辑“另存为新文件”成功后调用：注册新条目（_edit 后缀即另存）。
+  void registerSavedCopy(String fileName, File file, String? mediaUri) {
+    registerExported(fileName, file, mediaUri);
+  }
+
+  Future<void> _ensureEditedIndexLoaded() async {
+    if (_editedIndexLoaded) return;
+    _editedIndexLoaded = true;
+    try {
+      final f = await _editedIndexFile();
+      if (!await f.exists()) return;
+      final raw = jsonDecode(await f.readAsString());
+      if (raw is List) {
+        _overwrittenNames
+          ..clear()
+          ..addAll(raw.map((e) => e.toString().toUpperCase()));
+      }
+    } catch (_) {}
+  }
+
+  Future<File> _editedIndexFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File(dir.path + '/edited_media.json');
+  }
+
+  Future<void> _saveEditedIndex() async {
+    try {
+      final f = await _editedIndexFile();
+      await f.writeAsString(jsonEncode(_overwrittenNames.toList()));
+    } catch (_) {}
+  }
+
   /// 删除某张已导出照片
+  /// 按基础名查找本地已导出的全部文件（RAW+JPG/视频整组删除）。
+  List<ExportedMediaItem> findExportedItemsByBaseName(String baseName) {
+    final clean = _cleanBaseName(baseName);
+    return _exportedItems.where((e) => e.baseName == clean).toList();
+  }
+
   Future<bool> deleteItem(ExportedMediaItem item) async {
     try {
-      if (await item.file.exists()) {
-        await item.file.delete();
-      }
+      if (item.mediaUri != null) {
+        if (!await CameraNativeBridge.deleteMedia(item.mediaUri!)) return false;
+      } else if (await item.file.exists()) { await item.file.delete(); }
+      _sources.removeWhere((_, uri) => uri == item.mediaUri);
       _exportedItems.remove(item);
       // 重新评估 baseName 是否还有同组其他文件
       final hasSameBase = _exportedItems.any((e) => e.baseName == item.baseName);

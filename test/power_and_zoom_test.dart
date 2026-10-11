@@ -94,6 +94,8 @@ class MockCameraDriver implements CameraDriver {
   @override
   Future<Uint8List> getThumbnail(int handle) async => Uint8List(100);
   @override
+  Future<bool> deleteObject(int handle) async => true;
+  @override
   Future<Uint8List> downloadPartialObject(int handle, int offset, int maxBytes) async => Uint8List(maxBytes);
   @override
   Future<Uint8List> downloadFullObject(int handle, int totalSize, {Function(int current, int total)? onProgress}) async {

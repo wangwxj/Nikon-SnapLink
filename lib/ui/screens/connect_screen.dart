@@ -122,7 +122,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('连接失败: $e\n提示：请先在手机系统 Wi-Fi 中加入相机热点'),
-            backgroundColor: SnapColors.danger,
+            backgroundColor: SnapColors.of(context).danger,
             duration: const Duration(seconds: 4),
           ),
         );
@@ -219,7 +219,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
           if (isConnected)
             TextButton(
               onPressed: _handleDisconnect,
-              child: Text('断开', style: TextStyle(color: SnapColors.danger, fontWeight: FontWeight.bold)),
+              child: Text('断开', style: TextStyle(color: SnapColors.of(context).danger, fontWeight: FontWeight.bold)),
             ),
         ],
       ),
@@ -239,9 +239,9 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
-                        color: SnapColors.card,
+                        color: SnapColors.of(context).card,
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: SnapColors.border, width: 1.5),
+                        border: Border.all(color: SnapColors.of(context).border, width: 1.5),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withAlpha(102),
@@ -261,7 +261,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                             height: 52,
                             placeholderBuilder: (ctx) => Icon(
                               Icons.camera_alt,
-                              color: SnapColors.primary,
+                              color: SnapColors.of(context).primary,
                               size: 36,
                             ),
                           ),
@@ -274,13 +274,13 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
-                        color: SnapColors.textPrimary,
+                        color: SnapColors.of(context).textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '尼康 Z / D 系列专业无线监看与传输套件',
-                      style: TextStyle(fontSize: 11, color: SnapColors.textSecondary),
+                      style: TextStyle(fontSize: 11, color: SnapColors.of(context).textSecondary),
                     ),
                   ],
                 ),
@@ -292,9 +292,9 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: SnapColors.card,
+                  color: SnapColors.of(context).card,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: SnapColors.border, width: 0.8),
+                  border: Border.all(color: SnapColors.of(context).border, width: 0.8),
                 ),
                 child: Row(
                   children: [
@@ -349,12 +349,12 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: SnapColors.card,
+              color: SnapColors.of(context).card,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: SnapColors.border, width: 1.2),
+              border: Border.all(color: SnapColors.of(context).border, width: 1.2),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(120),
+                  color: Colors.black.withAlpha(Theme.of(context).brightness == Brightness.light ? 25 : 120),
                   blurRadius: 16,
                   offset: const Offset(0, 8),
                 ),
@@ -370,10 +370,10 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'CURRENT CAMERA',
                           style: TextStyle(
-                            color: Colors.white60,
+                            color: SnapColors.of(context).textSecondary,
                             fontSize: 10.5,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 1.5,
@@ -382,8 +382,8 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                         const SizedBox(height: 6),
                         Text(
                           cameraName,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: SnapColors.of(context).textPrimary,
                             fontSize: 26,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.5,
@@ -396,14 +396,14 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: SnapColors.primary,
+                        color: SnapColors.of(context).primary,
                         shape: BoxShape.circle,
                       ),
-                      child: const Center(
+                      child: Center(
                         child: Text(
                           'N',
                           style: TextStyle(
-                            color: Colors.black,
+                            color: SnapColors.of(context).textInverse,
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
                             fontFamily: 'sans-serif',
@@ -419,19 +419,19 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2A2410),
+                    color: SnapColors.of(context).primary.withAlpha(15),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: SnapColors.primary.withAlpha(80), width: 0.8),
+                    border: Border.all(color: SnapColors.of(context).primary.withAlpha(80), width: 0.8),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.circle, size: 7, color: SnapColors.primary),
+                      Icon(Icons.circle, size: 7, color: SnapColors.of(context).primary),
                       const SizedBox(width: 6),
                       Text(
                         '已连接  相机热点 Wi-Fi · $targetIp:$targetPort...',
                         style: TextStyle(
-                          color: SnapColors.primary,
+                          color: SnapColors.of(context).primary,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
@@ -448,16 +448,16 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: SnapColors.cardElevated,
+                          color: SnapColors.of(context).cardElevated,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: SnapColors.border, width: 0.8),
+                          border: Border.all(color: SnapColors.of(context).border, width: 0.8),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('品牌', style: TextStyle(color: SnapColors.textTertiary, fontSize: 10)),
-                            SizedBox(height: 2),
-                            Text('Nikon', style: TextStyle(color: SnapColors.textPrimary, fontSize: 14, fontWeight: FontWeight.bold)),
+                            Text('品牌', style: TextStyle(color: SnapColors.of(context).textTertiary, fontSize: 10)),
+                            const SizedBox(height: 2),
+                            Text('Nikon', style: TextStyle(color: SnapColors.of(context).textPrimary, fontSize: 14, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -467,16 +467,16 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: SnapColors.cardElevated,
+                          color: SnapColors.of(context).cardElevated,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: SnapColors.border, width: 0.8),
+                          border: Border.all(color: SnapColors.of(context).border, width: 0.8),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('型号', style: TextStyle(color: SnapColors.textTertiary, fontSize: 10)),
-                            SizedBox(height: 2),
-                            Text(cameraName, style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                            Text('型号', style: TextStyle(color: SnapColors.of(context).textTertiary, fontSize: 10)),
+                            const SizedBox(height: 2),
+                            Text(cameraName, style: TextStyle(color: SnapColors.of(context).textPrimary, fontSize: 14, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
                           ],
                         ),
                       ),
@@ -491,15 +491,15 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                   height: 48,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: SnapColors.primary,
-                      foregroundColor: Colors.black,
+                      backgroundColor: SnapColors.of(context).primary,
+                      foregroundColor: SnapColors.of(context).textInverse,
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     onPressed: widget.onNavigateToGallery,
                     child: const Text(
                       '浏览相机照片',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
                     ),
                   ),
                 ),
@@ -511,15 +511,15 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                   height: 48,
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1D1F26),
-                      foregroundColor: SnapColors.primary,
-                      side: BorderSide(color: SnapColors.primary, width: 1),
+                      backgroundColor: SnapColors.of(context).card,
+                      foregroundColor: SnapColors.of(context).primary,
+                      side: BorderSide(color: SnapColors.of(context).primary, width: 1),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    icon: Icon(Icons.videocam_outlined, size: 18, color: SnapColors.primary),
+                    icon: Icon(Icons.videocam_outlined, size: 18, color: SnapColors.of(context).primary),
                     label: const Text(
                       '远程控制 / 实时监看',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                     ),
                     onPressed: widget.onNavigateToLiveView ?? widget.onConnected,
                   ),
@@ -534,9 +534,9 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: SnapColors.card,
+              color: SnapColors.of(context).card,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: SnapColors.border, width: 1),
+              border: Border.all(color: SnapColors.of(context).border, width: 1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -546,25 +546,25 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.lens_blur_rounded, color: Colors.white70, size: 20),
-                        SizedBox(width: 8),
+                        Icon(Icons.lens_blur_rounded, color: SnapColors.of(context).textSecondary, size: 20),
+                        const SizedBox(width: 8),
                         Text(
                           '已连接镜头',
-                          style: TextStyle(color: SnapColors.textPrimary, fontSize: 14, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: SnapColors.of(context).textPrimary, fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2A2410),
+                        color: SnapColors.of(context).primary.withAlpha(15),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.circle, size: 6, color: SnapColors.primary),
-                          SizedBox(width: 4),
-                          Text('已识别', style: TextStyle(color: SnapColors.primary, fontSize: 10, fontWeight: FontWeight.bold)),
+                          Icon(Icons.circle, size: 6, color: SnapColors.of(context).primary),
+                          const SizedBox(width: 4),
+                          Text('已识别', style: TextStyle(color: SnapColors.of(context).primary, fontSize: 10, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -573,7 +573,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                 const SizedBox(height: 10),
                 Text(
                   '50-250mm · f/4.5-6.3',
-                  style: TextStyle(color: SnapColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w900),
+                  style: TextStyle(color: SnapColors.of(context).textPrimary, fontSize: 18, fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 14),
 
@@ -603,8 +603,8 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
           Center(
             child: TextButton.icon(
               onPressed: _handleDisconnect,
-              icon: const Icon(Icons.link_off, color: Colors.white38, size: 16),
-              label: const Text('断开与相机的连接并释放网络', style: TextStyle(color: Colors.white38, fontSize: 12)),
+              icon: Icon(Icons.link_off, color: SnapColors.of(context).textSecondary, size: 16),
+              label: Text('断开与相机的连接并释放网络', style: TextStyle(color: SnapColors.of(context).textSecondary, fontSize: 12)),
             ),
           ),
         ],
@@ -616,15 +616,15 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: SnapColors.cardElevated,
+        color: SnapColors.of(context).cardElevated,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(color: Colors.white54, fontSize: 9.5)),
+          Text(title, style: TextStyle(color: SnapColors.of(context).textSecondary, fontSize: 9.5)),
           const SizedBox(height: 3),
-          Text(val, style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold)),
+          Text(val, style: TextStyle(color: SnapColors.of(context).textPrimary, fontSize: 11.5, fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -646,9 +646,9 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: SnapColors.card,
+              color: SnapColors.of(context).card,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: SnapColors.border, width: 0.8),
+              border: Border.all(color: SnapColors.of(context).border, width: 0.8),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -661,20 +661,20 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                         Icon(
                           Icons.wifi_tethering,
                           size: 22,
-                          color: _wifiInfo.connected ? SnapColors.primary : SnapColors.textTertiary,
+                          color: _wifiInfo.connected ? SnapColors.of(context).primary : SnapColors.of(context).textTertiary,
                         ),
                         const SizedBox(width: 10),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('当前连接 Wi-Fi', style: TextStyle(color: SnapColors.textTertiary, fontSize: 11)),
+                            Text('当前连接 Wi-Fi', style: TextStyle(color: SnapColors.of(context).textTertiary, fontSize: 11)),
                             const SizedBox(height: 2),
                             Text(
                               _wifiInfo.ssid,
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                color: SnapColors.textPrimary,
+                                color: SnapColors.of(context).textPrimary,
                               ),
                             ),
                           ],
@@ -682,7 +682,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                       ],
                     ),
                     IconButton(
-                      icon: Icon(Icons.refresh, size: 20, color: SnapColors.primary),
+                      icon: Icon(Icons.refresh, size: 20, color: SnapColors.of(context).primary),
                       onPressed: _refreshWifiStatus,
                       tooltip: '重新探测 Wi-Fi',
                       constraints: const BoxConstraints(),
@@ -696,15 +696,15 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: SnapColors.card,
+                    color: SnapColors.of(context).card,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: SnapColors.border, width: 0.5),
+                    border: Border.all(color: SnapColors.of(context).border, width: 0.5),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         hasCameraWifi ? Icons.check_circle_outline : Icons.info_outline,
-                        color: hasCameraWifi ? SnapColors.success : SnapColors.warning,
+                        color: hasCameraWifi ? SnapColors.of(context).success : SnapColors.of(context).warning,
                         size: 18,
                       ),
                       const SizedBox(width: 8),
@@ -715,7 +715,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                               : '请在手机系统 Wi-Fi 中加入相机释放的热点（例如 NIKON_...）',
                           style: TextStyle(
                             fontSize: 12,
-                            color: hasCameraWifi ? SnapColors.textPrimary : SnapColors.warning,
+                            color: hasCameraWifi ? SnapColors.of(context).textPrimary : SnapColors.of(context).warning,
                           ),
                         ),
                       ),
@@ -729,13 +729,13 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: SnapColors.primary,
-                      side: BorderSide(color: SnapColors.primary, width: 0.8),
+                      foregroundColor: SnapColors.of(context).primary,
+                      side: BorderSide(color: SnapColors.of(context).primary, width: 0.8),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     icon: const Icon(Icons.settings, size: 16),
-                    label: const Text('打开手机系统 Wi-Fi 设置', style: TextStyle(fontSize: 13)),
+                    label: const Text('打开手机系统 Wi-Fi 设置', style: const TextStyle(fontSize: 13)),
                     onPressed: () => CameraNativeBridge.openWifiSettings(),
                   ),
                 ),
@@ -755,16 +755,16 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
               height: 48,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: SnapColors.primary,
-                  foregroundColor: Colors.black,
+                  backgroundColor: SnapColors.of(context).primary,
+                  foregroundColor: SnapColors.of(context).textInverse,
                   elevation: 2,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 icon: _isConnecting
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.black)),
+                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(SnapColors.of(context).textInverse)),
                       )
                     : const Icon(Icons.link, size: 20),
                 label: Text(
@@ -792,9 +792,9 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: SnapColors.card,
+              color: SnapColors.of(context).card,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: SnapColors.border, width: 0.8),
+              border: Border.all(color: SnapColors.of(context).border, width: 0.8),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -807,24 +807,24 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                         Icon(
                           Icons.bluetooth,
                           size: 20,
-                          color: _isBluetoothEnabled ? Colors.lightBlueAccent : SnapColors.textTertiary,
+                          color: _isBluetoothEnabled ? Colors.lightBlueAccent : SnapColors.of(context).textTertiary,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           _isBluetoothEnabled ? '手机蓝牙已开启' : '手机蓝牙已关闭',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: SnapColors.textPrimary),
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: SnapColors.of(context).textPrimary),
                         ),
                       ],
                     ),
                     VantTag(
                       text: _bleStatus == 'connected' ? '已连接' : (_bleStatus == 'connecting' ? '配对中' : '未连接'),
-                      color: _bleStatus == 'connected' ? SnapColors.success : SnapColors.textTertiary,
+                      color: _bleStatus == 'connected' ? SnapColors.of(context).success : SnapColors.of(context).textTertiary,
                     ),
                   ],
                 ),
                 if (_bleConnectedDeviceName.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  Text('当前配对: $_bleConnectedDeviceName', style: TextStyle(color: SnapColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text('当前配对: $_bleConnectedDeviceName', style: TextStyle(color: SnapColors.of(context).primary, fontSize: 12, fontWeight: FontWeight.bold)),
                 ],
               ],
             ),
@@ -840,22 +840,22 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: SnapColors.card,
+                color: SnapColors.of(context).card,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: SnapColors.border, width: 0.8),
+                border: Border.all(color: SnapColors.of(context).border, width: 0.8),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('无线遥控快门 (ML-L7)', style: TextStyle(color: SnapColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold)),
+                  Text('无线遥控快门 (ML-L7)', style: TextStyle(color: SnapColors.of(context).textPrimary, fontSize: 13, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2B2D38),
-                            foregroundColor: SnapColors.textPrimary,
+                            backgroundColor: SnapColors.of(context).card,
+                            foregroundColor: SnapColors.of(context).textPrimary,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
@@ -868,13 +868,13 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                       Expanded(
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: SnapColors.primary,
-                            foregroundColor: Colors.black,
+                            backgroundColor: SnapColors.of(context).primary,
+                            foregroundColor: SnapColors.of(context).textInverse,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           icon: const Icon(Icons.camera, size: 18),
-                          label: const Text('全按拍照', style: TextStyle(fontWeight: FontWeight.bold)),
+                          label: const Text('全按拍照', style: const TextStyle(fontWeight: FontWeight.bold)),
                           onPressed: null,
                         ),
                       ),
@@ -913,17 +913,17 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (dev.isNikon) ...[
-                      VantTag(text: 'NIKON', color: SnapColors.primary),
+                      VantTag(text: 'NIKON', color: SnapColors.of(context).primary),
                       const SizedBox(width: 8),
                     ],
                     OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: dev.isNikon ? SnapColors.primary : SnapColors.textSecondary,
-                        side: BorderSide(color: dev.isNikon ? SnapColors.primary : SnapColors.border),
+                        foregroundColor: dev.isNikon ? SnapColors.of(context).primary : SnapColors.of(context).textSecondary,
+                        side: BorderSide(color: dev.isNikon ? SnapColors.of(context).primary : SnapColors.of(context).border),
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                       ),
                       onPressed: () => _connectBleDevice(dev),
-                      child: const Text('连接', style: TextStyle(fontSize: 12)),
+                      child: const Text('连接', style: const TextStyle(fontSize: 12)),
                     ),
                   ],
                 ),
@@ -932,12 +932,12 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
           ),
         ] else if (_isBleScanning) ...[
           Padding(
-            padding: EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
             child: Column(
               children: [
-                CircularProgressIndicator(color: SnapColors.primary, strokeWidth: 2.5),
-                SizedBox(height: 12),
-                Text('正在搜索附近的相机与蓝牙设备...', style: TextStyle(color: SnapColors.textSecondary, fontSize: 13)),
+                CircularProgressIndicator(color: SnapColors.of(context).primary, strokeWidth: 2.5),
+                const SizedBox(height: 12),
+                Text('正在搜索附近的相机与蓝牙设备...', style: TextStyle(color: SnapColors.of(context).textSecondary, fontSize: 13)),
               ],
             ),
           ),
@@ -967,7 +967,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
               title: 'USB 主机状态',
               customValue: VantTag(
                 text: isConnected ? '有线已连通' : '等待设备接入',
-                color: isConnected ? SnapColors.success : SnapColors.warning,
+                color: isConnected ? SnapColors.of(context).success : SnapColors.of(context).warning,
               ),
             ),
           ],
@@ -983,7 +983,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
             onTap: () {
               _addLog('检测 USB OTG 接口...');
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请插上 Type-C OTG 线缆直连相机')),
+                const SnackBar(content: const Text('请插上 Type-C OTG 线缆直连相机')),
               );
             },
           ),
@@ -1000,7 +1000,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? SnapColors.primary : Colors.transparent,
+          color: isSelected ? SnapColors.of(context).primary : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
         ),
         child: FittedBox(
@@ -1012,7 +1012,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
               Icon(
                 icon,
                 size: 16,
-                color: isSelected ? Colors.black : SnapColors.textSecondary,
+                color: isSelected ? SnapColors.of(context).textInverse : SnapColors.of(context).textSecondary,
               ),
               const SizedBox(width: 6),
               Text(
@@ -1020,7 +1020,7 @@ class _ConnectScreenState extends State<ConnectScreen> with WidgetsBindingObserv
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? Colors.black : SnapColors.textSecondary,
+                  color: isSelected ? SnapColors.of(context).textInverse : SnapColors.of(context).textSecondary,
                 ),
               ),
             ],

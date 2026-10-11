@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
-import '../../core/utils/exif_helper.dart';
 import '../../engine/filter/photo_filter.dart';
 
 /// 直方图五大核心曝光区间定义 (对标 Adobe Lightroom 5-Zone Exposure)
@@ -20,10 +19,10 @@ enum HistogramZone {
 
 /// 直方图通道频数统计模型
 class HistogramData {
-  final List<double> redBins;   // 64 bins, 0.0 ~ 1.0
+  final List<double> redBins; // 64 bins, 0.0 ~ 1.0
   final List<double> greenBins; // 64 bins, 0.0 ~ 1.0
-  final List<double> blueBins;  // 64 bins, 0.0 ~ 1.0
-  final List<double> lumBins;   // 64 bins, 0.0 ~ 1.0
+  final List<double> blueBins; // 64 bins, 0.0 ~ 1.0
+  final List<double> lumBins; // 64 bins, 0.0 ~ 1.0
 
   const HistogramData({
     required this.redBins,
@@ -44,7 +43,10 @@ class HistogramData {
     const binCount = 64;
 
     // 若具备实际图像采样像素，进行高保真实时变换运算
-    if (sampledR != null && sampledG != null && sampledB != null && sampledR.isNotEmpty) {
+    if (sampledR != null &&
+        sampledG != null &&
+        sampledB != null &&
+        sampledR.isNotEmpty) {
       final matrix = PhotoFilterEngine.createCompositeMatrix(
         filterType: filterType,
         filterIntensity: filterIntensity,
@@ -58,11 +60,13 @@ class HistogramData {
 
       final n = sampledR.length;
       for (int i = 0; i < n; i++) {
-        final transformed = PhotoFilterEngine.applyMatrixToRgb(sampledR[i], sampledG[i], sampledB[i], matrix);
+        final transformed = PhotoFilterEngine.applyMatrixToRgb(
+            sampledR[i], sampledG[i], sampledB[i], matrix);
         final r = transformed[0];
         final g = transformed[1];
         final b = transformed[2];
-        final lum = (0.2126 * r + 0.7152 * g + 0.0722 * b).round().clamp(0, 255);
+        final lum =
+            (0.2126 * r + 0.7152 * g + 0.0722 * b).round().clamp(0, 255);
 
         rCounts[(r * (binCount - 1) ~/ 255).clamp(0, binCount - 1)]++;
         gCounts[(g * (binCount - 1) ~/ 255).clamp(0, binCount - 1)]++;
@@ -79,10 +83,14 @@ class HistogramData {
       }
 
       return HistogramData(
-        redBins: List.generate(binCount, (i) => (rCounts[i] / maxR).clamp(0.0, 1.0)),
-        greenBins: List.generate(binCount, (i) => (gCounts[i] / maxG).clamp(0.0, 1.0)),
-        blueBins: List.generate(binCount, (i) => (bCounts[i] / maxB).clamp(0.0, 1.0)),
-        lumBins: List.generate(binCount, (i) => (lumCounts[i] / maxLum).clamp(0.0, 1.0)),
+        redBins:
+            List.generate(binCount, (i) => (rCounts[i] / maxR).clamp(0.0, 1.0)),
+        greenBins:
+            List.generate(binCount, (i) => (gCounts[i] / maxG).clamp(0.0, 1.0)),
+        blueBins:
+            List.generate(binCount, (i) => (bCounts[i] / maxB).clamp(0.0, 1.0)),
+        lumBins: List.generate(
+            binCount, (i) => (lumCounts[i] / maxLum).clamp(0.0, 1.0)),
       );
     }
 
@@ -105,13 +113,16 @@ class HistogramData {
       final rX = (i - (32.0 + shiftExp + shiftTemp)) / (11.0 / contrastScale);
       final bX = (i - (32.0 + shiftExp - shiftTemp)) / (11.0 / contrastScale);
 
-      rBins[i] = (math.exp(-0.5 * rX * rX) * (0.85 + 0.15 * math.sin(i * 0.2))).clamp(0.0, 1.0);
+      rBins[i] = (math.exp(-0.5 * rX * rX) * (0.85 + 0.15 * math.sin(i * 0.2)))
+          .clamp(0.0, 1.0);
       gBins[i] = (baseVal * (0.80 + 0.15 * math.cos(i * 0.25))).clamp(0.0, 1.0);
-      bBins[i] = (math.exp(-0.5 * bX * bX) * (0.88 + 0.12 * math.sin(i * 0.3))).clamp(0.0, 1.0);
+      bBins[i] = (math.exp(-0.5 * bX * bX) * (0.88 + 0.12 * math.sin(i * 0.3)))
+          .clamp(0.0, 1.0);
       lBins[i] = (baseVal * 0.92).clamp(0.0, 1.0);
     }
 
-    return HistogramData(redBins: rBins, greenBins: gBins, blueBins: bBins, lumBins: lBins);
+    return HistogramData(
+        redBins: rBins, greenBins: gBins, blueBins: bBins, lumBins: lBins);
   }
 }
 
@@ -141,8 +152,10 @@ class LightroomHistogramPainter extends CustomPainter {
     final zoneWidth = size.width / 5.0;
     if (selectedZone != null) {
       final zoneIndex = selectedZone!.index;
-      final zoneRect = Rect.fromLTWH(zoneIndex * zoneWidth, 0, zoneWidth, size.height);
-      canvas.drawRect(zoneRect, Paint()..color = SnapColors.primary.withAlpha(25));
+      final zoneRect =
+          Rect.fromLTWH(zoneIndex * zoneWidth, 0, zoneWidth, size.height);
+      canvas.drawRect(
+          zoneRect, Paint()..color = SnapColors.primary.withAlpha(25));
     }
 
     final gridPaint = Paint()
@@ -158,7 +171,8 @@ class LightroomHistogramPainter extends CustomPainter {
     final basePaint = Paint()
       ..color = const Color(0xFF2979FF)
       ..strokeWidth = 1.5;
-    canvas.drawLine(Offset(4, baseLineY), Offset(size.width - 4, baseLineY), basePaint);
+    canvas.drawLine(
+        Offset(4, baseLineY), Offset(size.width - 4, baseLineY), basePaint);
 
     final count = data.lumBins.length;
     final stepX = (size.width - 16) / (count - 1);
@@ -181,13 +195,16 @@ class LightroomHistogramPainter extends CustomPainter {
     canvas.drawPath(lumPath, lumFill);
 
     // 5. R (红) 曲线
-    _drawSmoothCurve(canvas, data.redBins, startX, stepX, baseLineY, size.height - 10, const Color(0xFFFF5252));
+    _drawSmoothCurve(canvas, data.redBins, startX, stepX, baseLineY,
+        size.height - 10, const Color(0xFFFF5252));
 
     // 6. G (绿) 曲线
-    _drawSmoothCurve(canvas, data.greenBins, startX, stepX, baseLineY, size.height - 10, const Color(0xFF66BB6A));
+    _drawSmoothCurve(canvas, data.greenBins, startX, stepX, baseLineY,
+        size.height - 10, const Color(0xFF66BB6A));
 
     // 7. B (蓝) 曲线
-    _drawSmoothCurve(canvas, data.blueBins, startX, stepX, baseLineY, size.height - 10, const Color(0xFF42A5F5));
+    _drawSmoothCurve(canvas, data.blueBins, startX, stepX, baseLineY,
+        size.height - 10, const Color(0xFF42A5F5));
 
     // 8. 边缘精致微细内边框
     canvas.drawRRect(
@@ -237,18 +254,14 @@ class LightroomHistogramPainter extends CustomPainter {
 /// Adobe Lightroom 风格多功能直方图交互组件
 class LightroomHistogramWidget extends StatelessWidget {
   final HistogramData data;
-  final PhotoMetadata? metadata;
   final HistogramZone? selectedZone;
   final ValueChanged<HistogramZone>? onSelectZone;
-  final VoidCallback? onResetAll;
 
   const LightroomHistogramWidget({
     super.key,
     required this.data,
-    this.metadata,
     this.selectedZone,
     this.onSelectZone,
-    this.onResetAll,
   });
 
   @override
@@ -256,63 +269,13 @@ class LightroomHistogramWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: SnapColors.card,
+        color: SnapColors.of(context).card,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: SnapColors.border),
+        border: Border.all(color: SnapColors.of(context).border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 顶部信息条: 直方图标题、相机 EXIF 与一键重置
-          Row(
-            children: [
-              Icon(Icons.bar_chart, color: SnapColors.primary, size: 16),
-              const SizedBox(width: 6),
-              const Text(
-                'HISTOGRAM 直方图',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const Spacer(),
-              if (metadata != null && metadata!.hasValidExif)
-                Text(
-                  '${metadata!.iso} · ${metadata!.aperture} · ${metadata!.shutterSpeed}',
-                  style: TextStyle(
-                    color: SnapColors.textSecondary,
-                    fontSize: 10,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              if (onResetAll != null) ...[
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: onResetAll,
-                  borderRadius: BorderRadius.circular(4),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.refresh, size: 12, color: SnapColors.primary),
-                        SizedBox(width: 2),
-                        Text(
-                          '重置参数',
-                          style: TextStyle(color: SnapColors.primary, fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
           // 核心 RGB 波形与明度曲线画布
           SizedBox(
             height: 64,
@@ -326,6 +289,19 @@ class LightroomHistogramWidget extends StatelessWidget {
 
           const SizedBox(height: 6),
 
+          Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [0, 64, 128, 192, 255]
+                    .map((value) => Text('$value',
+                        style: TextStyle(
+                            color: SnapColors.of(context).textSecondary,
+                            fontSize: 10)))
+                    .toList(),
+              )),
+          const SizedBox(height: 4),
+
           // 底部五大曝光区间指引标 (点击可快速聚焦对应调色项)
           Row(
             children: HistogramZone.values.map((zone) {
@@ -337,10 +313,14 @@ class LightroomHistogramWidget extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 3),
                     decoration: BoxDecoration(
-                      color: isSelected ? SnapColors.primary.withAlpha(35) : Colors.transparent,
+                      color: isSelected
+                          ? SnapColors.of(context).primary.withAlpha(35)
+                          : Colors.transparent,
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: isSelected ? SnapColors.primary : Colors.transparent,
+                        color: isSelected
+                            ? SnapColors.of(context).primary
+                            : Colors.transparent,
                         width: 0.8,
                       ),
                     ),
@@ -348,9 +328,12 @@ class LightroomHistogramWidget extends StatelessWidget {
                       zone.label,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: isSelected ? SnapColors.primary : SnapColors.textTertiary,
+                        color: isSelected
+                            ? SnapColors.of(context).primary
+                            : SnapColors.of(context).textTertiary,
                         fontSize: 9.5,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -358,6 +341,10 @@ class LightroomHistogramWidget extends StatelessWidget {
               );
             }).toList(),
           ),
+          Text('直方图',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: SnapColors.of(context).textTertiary, fontSize: 10)),
         ],
       ),
     );

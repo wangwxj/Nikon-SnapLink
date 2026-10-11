@@ -20,6 +20,14 @@ void main() {
       expect(AppSettings.instance.cameraIp, equals('192.168.0.1'));
       expect(AppSettings.instance.cameraPort, equals(15740));
       expect(AppSettings.instance.themeMode, equals(AppThemeMode.system));
+      expect(AppSettings.instance.confirmDelete, isTrue);
+    });
+
+    test('删除确认开关可切换', () {
+      AppSettings.instance.setConfirmDelete(false);
+      expect(AppSettings.instance.confirmDelete, isFalse);
+      AppSettings.instance.setConfirmDelete(true);
+      expect(AppSettings.instance.confirmDelete, isTrue);
     });
 
     test('外观模式切换并映射到 Material ThemeMode', () {

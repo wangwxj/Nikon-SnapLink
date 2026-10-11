@@ -59,6 +59,12 @@ class WatermarkCanvasPainter extends CustomPainter {
 
   /// 计算在给定源图尺寸与模板下的目标排版画布尺寸与图片放置位置
   static LayoutMetrics computeLayout(double srcW, double srcH, WatermarkTemplate template, [double spacing = 1.0]) {
+    // 水印字号以 1200px 设计基准等比缩放；输入低于基准时整体等比放大光栅
+    // (版式比例不变，照片随之放大)，否则低分辨率裁切后字号过小、导出糊成一团。
+    if (template != WatermarkTemplate.none && srcW < 1200) {
+      srcH *= 1200 / srcW;
+      srcW = 1200;
+    }
     switch (template) {
       case WatermarkTemplate.none: {
         return LayoutMetrics(

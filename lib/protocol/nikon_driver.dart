@@ -971,6 +971,19 @@ class NikonDriver implements CameraDriver {
   }
 
   @override
+  Future<bool> deleteObject(int handle) async {
+    if (!isConnected) return false;
+    try {
+      // 对齐 reverse_analysis MainActivity.deleteUsbMedia: 参数 [objectHandle, 0]
+      await _client!.executeOperation(PtpOpCodes.deleteObject, [handle, 0]);
+      _objectInfoCache.remove(handle);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
   Future<Uint8List> getThumbnail(int handle) async {
     if (!isConnected) return Uint8List(0);
     if (_thumbCache.containsKey(handle)) {

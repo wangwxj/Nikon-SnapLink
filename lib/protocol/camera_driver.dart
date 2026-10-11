@@ -123,6 +123,10 @@ abstract class CameraDriver {
   Future<Uint8List> downloadPartialObject(int handle, int offset, int maxBytes);
   Future<Uint8List> downloadFullObject(int handle, int totalSize, {Function(int current, int total)? onProgress});
 
+  /// 删除相机存储卡上的对象 (标准 PTP DeleteObject 0x100B)。
+  /// Wi-Fi PTP/IP 与 USB PTP 共用同一实现，成功返回 true。
+  Future<bool> deleteObject(int handle);
+
   // ------------------------------------
   // 新拍照事件流 (边拍边传)
   // ------------------------------------

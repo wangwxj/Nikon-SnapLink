@@ -46,10 +46,14 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.InetAddress
+import java.security.MessageDigest
+import java.util.concurrent.Executors
 import androidx.core.content.FileProvider
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.nikon.snaplink/native_camera"
+    // 媒体 I/O 全局串行，最多一个任务；若并行导出成为瓶颈，可改为按 URI 串行。
+    private val mediaExecutor = Executors.newSingleThreadExecutor()
     private val TAG = "SnapLinkNative"
     private val REQUEST_PICK_IMAGE = 1001
     private val ACTION_USB_PERMISSION = "com.nikon.snaplink.USB_PERMISSION"
@@ -201,9 +205,34 @@ class MainActivity: FlutterActivity() {
                         if (!file.exists()) {
                             result.error("NOT_FOUND", "File does not exist", null)
                         } else {
-                            val saved = saveImageToPublicPictures(file)
-                            result.success(saved)
+                            mediaTask(result) { saveImageToPublicPictures(file) ?: throw java.io.IOException("MediaStore 保存失败") }
                         }
+                    }
+                }
+                "listSavedMedia" -> mediaTask(result) { listSavedMedia() }
+                "materializeMedia" -> {
+                    val uri = call.argument<String>("uri")
+                    mediaTask(result) { materializeMedia(uri ?: "") }
+                }
+                "findMediaUris" -> {
+                    val fileNames = call.argument<List<*>>("fileNames")?.filterIsInstance<String>() ?: emptyList()
+                    result.success(findMediaUrisByNames(fileNames))
+                }
+                "overwriteMedia" -> {
+                    val mediaUri = call.argument<String>("mediaUri")
+                    val srcPath = call.argument<String>("srcPath")
+                    if (mediaUri.isNullOrBlank() || srcPath.isNullOrBlank()) {
+                        result.success(false)
+                    } else {
+                        mediaTask(result) { overwriteMediaEntry(mediaUri, srcPath) }
+                    }
+                }
+                "deleteMedia" -> {
+                    val target = call.argument<String>("target")
+                    if (target.isNullOrBlank()) {
+                        result.error("INVALID_TARGET", "Target is empty", null)
+                    } else {
+                        result.success(deleteMediaTarget(target))
                     }
                 }
                 "saveMediaToGallery" -> {
@@ -216,12 +245,7 @@ class MainActivity: FlutterActivity() {
                         if (!file.exists()) {
                             result.error("NOT_FOUND", "File does not exist", null)
                         } else {
-                            val saved = saveMediaToPublic(file, fileName ?: file.name)
-                            if (saved != null) {
-                                result.success(saved)
-                            } else {
-                                result.error("SAVE_FAILED", "MediaStore 保存失败", null)
-                            }
+                            mediaTask(result) { saveMediaToPublic(file, fileName ?: file.name) ?: throw java.io.IOException("MediaStore 保存失败") }
                         }
                     }
                 }
@@ -956,6 +980,197 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    /**
+     * 用本地文件字节覆盖已有 MediaStore 条目的内容。
+     * 仅对本应用写入的条目可靠；异常或 0 字节写入返回 false，由 Dart 回退到另存。
+     */
+    private fun mediaTask(result: MethodChannel.Result, work: () -> Any?) {
+        mediaExecutor.execute {
+            try {
+                val value = work()
+                runOnUiThread { result.success(value) }
+            } catch (e: Exception) {
+                val code = if (e is IllegalStateException) "OVERWRITE_RESTORE_FAILED" else "MEDIA_READ_FAILED"
+                runOnUiThread { result.error(code, e.message, null) }
+            }
+        }
+    }
+
+    private fun listSavedMedia(): List<Map<String, Any>> {
+        val collection = MediaStore.Files.getContentUri("external")
+        val pathColumn = if (Build.VERSION.SDK_INT >= 29) MediaStore.MediaColumns.RELATIVE_PATH else MediaStore.MediaColumns.DATA
+        val columns = arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.DATE_MODIFIED, pathColumn)
+        val found = mutableListOf<Map<String, Any>>()
+        val selection = "$pathColumn LIKE ? OR $pathColumn LIKE ?"
+        contentResolver.query(collection, columns, selection, arrayOf("%/SnapLink/%", "SnapLink/%"), null)?.use { c ->
+            while (c.moveToNext()) {
+                val path = c.getString(4) ?: continue
+                if (!path.replace('\\', '/').split('/').any { it.equals("SnapLink", true) }) continue
+                val name = c.getString(1) ?: continue
+                if (!Regex("(?i).*\\.(jpg|jpeg|png|nef|nrw|mov|mp4)$").matches(name)) continue
+                val uri = if (Build.VERSION.SDK_INT < 29) path else
+                    Uri.withAppendedPath(resolveSaveTarget(name).first, c.getLong(0).toString()).toString()
+                found.add(mapOf("uri" to uri,
+                    "name" to name, "size" to c.getLong(2), "modified" to c.getLong(3) * 1000L,
+                    "path" to if (Build.VERSION.SDK_INT < 29) path else ""))
+            }
+        }
+        return found
+    }
+
+    private fun materializeMedia(target: String): String? {
+        val uri = Uri.parse(target)
+        require(uri.scheme == "content" && uri.authority == "media") { "无效的媒体 URI" }
+        val dir = File(cacheDir, "saved_media").apply { mkdirs() }
+        val digest = MessageDigest.getInstance("SHA-256").digest(target.toByteArray()).joinToString("") { "%02x".format(it) }
+        var size = 0L
+        var modified = 0L
+        var name = "image.jpg"
+        contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.DATE_MODIFIED,
+            MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (!c.moveToFirst()) return null
+            size = c.getLong(0); modified = c.getLong(1); name = c.getString(2) ?: name
+        } ?: return null
+        val ext = name.substringAfterLast('.', "jpg").lowercase().filter { it.isLetterOrDigit() }
+        val dest = File(dir, "${digest}_${modified}_${size}.$ext")
+        if (dest.exists() && dest.length() == size && size > 0) {
+            dest.setLastModified(System.currentTimeMillis())
+            return dest.absolutePath
+        }
+        val partial = File(dir, dest.name + ".part")
+        try {
+            contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(partial).use { input.copyTo(it) } } ?: return null
+            if (partial.length() != size || size == 0L) throw java.io.IOException("本地媒体长度不完整")
+            if (!partial.renameTo(dest)) throw java.io.IOException("本地缓存保存失败")
+            // 仅删除此 URI 的旧缓存；其他照片由应用缓存生命周期管理。
+            dir.listFiles()?.filter { it.name.startsWith(digest + "_") && it != dest }?.forEach { it.delete() }
+            // 缓存上限 128MiB，单张更大的当前照片保留；严格限额需改为流式读取。
+            val cached = dir.listFiles()?.filter { it.isFile }?.sortedBy { it.lastModified() } ?: emptyList()
+            var total = cached.sumOf { it.length() }
+            for (file in cached) {
+                if (total <= 128L * 1024 * 1024) break
+                if (file == dest) continue
+                val length = file.length()
+                if (file.delete()) total -= length
+            }
+            return dest.absolutePath
+        } finally { partial.delete() }
+    }
+
+    private fun mediaMatchesFile(uri: Uri, file: File): Boolean {
+        fun digest(input: java.io.InputStream): ByteArray {
+            val hash = MessageDigest.getInstance("SHA-256")
+            val buffer = ByteArray(64 * 1024)
+            while (true) { val n = input.read(buffer); if (n < 0) break; hash.update(buffer, 0, n) }
+            return hash.digest()
+        }
+        val expected = FileInputStream(file).use { digest(it) }
+        val actual = contentResolver.openInputStream(uri)?.use { digest(it) } ?: return false
+        return expected.contentEquals(actual)
+    }
+
+    private fun overwriteMediaEntry(mediaUri: String, srcPath: String): Boolean {
+        val srcFile = File(srcPath)
+        if (!srcFile.exists() || srcFile.length() == 0L) return false
+        val uri = Uri.parse(mediaUri)
+        if (uri.scheme != "content" || uri.authority != "media") return false
+        if (Build.VERSION.SDK_INT >= 29) {
+            contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.OWNER_PACKAGE_NAME), null, null, null)?.use { c ->
+                if (!c.moveToFirst() || c.getString(0) != packageName) return false
+            } ?: return false
+        }
+        var keepBackup = false
+        val backupDir = File(filesDir, "photo_backups").apply { mkdirs() }
+        val backup = File.createTempFile("snaplink_original_", ".bak", backupDir)
+        try {
+            contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(backup).use { input.copyTo(it) } } ?: return false
+            try {
+                contentResolver.openOutputStream(uri, "wt")?.use { out -> FileInputStream(srcFile).use { it.copyTo(out) } }
+                    ?: return false
+                if (!mediaMatchesFile(uri, srcFile)) throw java.io.IOException("覆盖校验失败")
+                val values = ContentValues().apply { put(MediaStore.MediaColumns.DATE_MODIFIED, System.currentTimeMillis() / 1000) }
+                contentResolver.update(uri, values, null, null)
+                val digest = MessageDigest.getInstance("SHA-256").digest(mediaUri.toByteArray()).joinToString("") { "%02x".format(it) }
+                File(cacheDir, "saved_media").listFiles()?.filter { it.name.startsWith(digest + "_") }?.forEach { it.delete() }
+                return true
+            } catch (writeError: Exception) {
+                try {
+                    contentResolver.openOutputStream(uri, "wt")?.use { out -> FileInputStream(backup).use { it.copyTo(out) } }
+                        ?: throw java.io.IOException("无法恢复原图")
+                    if (!mediaMatchesFile(uri, backup)) throw java.io.IOException("原图恢复校验失败")
+                } catch (restoreError: Exception) {
+                    // 恢复失败时保留备份，供用户恢复；绝不能静默另存后报告成功。
+                    keepBackup = true
+                    throw IllegalStateException("原图恢复失败；备份位于 " + backup.absolutePath, restoreError)
+                }
+                return false
+            }
+        } catch (e: IllegalStateException) { throw e
+        } catch (e: Exception) { Log.e(TAG, "overwrite failed", e); return false
+        } finally { if (!keepBackup) backup.delete() }
+    }
+
+    /**
+     * 批量按文件名反查 MediaStore URI。
+     * 每个媒体集合只查询一次，返回 fileName -> URI；只接受 SnapLink 目录，避免误删同名系统文件。
+     */
+    private fun findMediaUrisByNames(fileNames: List<String>): Map<String, String> {
+        if (fileNames.isEmpty()) return emptyMap()
+        val wanted = fileNames.toSet()
+        val result = mutableMapOf<String, String>()
+        val projection = arrayOf(
+            MediaStore.MediaColumns._ID,
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.RELATIVE_PATH
+        )
+        val collections = listOf(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            MediaStore.Files.getContentUri("external")
+        )
+        for (collection in collections) {
+            try {
+                contentResolver.query(collection, projection, null, null, null)?.use { cursor ->
+                    val idIdx = cursor.getColumnIndex(MediaStore.MediaColumns._ID)
+                    val nameIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
+                    val relIdx = cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
+                    while (cursor.moveToNext()) {
+                        if (idIdx < 0 || nameIdx < 0) continue
+                        val name = cursor.getString(nameIdx) ?: continue
+                        if (name !in wanted || result.containsKey(name)) continue
+                        val relative = if (relIdx >= 0) cursor.getString(relIdx) else null
+                        if (relative != null && !relative.contains("SnapLink", ignoreCase = true)) continue
+                        result[name] = Uri.withAppendedPath(collection, cursor.getLong(idIdx).toString()).toString()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "findMediaUrisByNames failed: " + e.message)
+            }
+        }
+        return result
+    }
+
+    /**
+     * 删除公共媒体库条目（content:// URI，Android 10+ 无需存储权限）或旧系统绝对路径文件。
+     * 返回 true 表示条目/文件已不存在或删除成功。
+     */
+    private fun deleteMediaTarget(target: String): Boolean {
+        return try {
+            if (target.startsWith("content://")) {
+                val uri = Uri.parse(target)
+                val deleted = contentResolver.delete(uri, null, null)
+                deleted > 0
+            } else {
+                val file = File(target)
+                if (file.exists()) file.delete() else true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteMediaTarget failed: " + e.message)
+            false
+        }
+    }
+
     /** 按媒体类型选择公共集合：图片 -> Pictures/SnapLink，视频 -> Movies/SnapLink，RAW -> Downloads/SnapLink */
     private fun resolveSaveTarget(fileName: String): Triple<Uri, String, String?> {
         val lower = fileName.lowercase()
@@ -970,7 +1185,7 @@ class MainActivity: FlutterActivity() {
         val isRaw = lower.endsWith(".nef") || lower.endsWith(".nrw")
         return when {
             isVideo -> Triple(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "Movies/SnapLink", mime)
-            isRaw -> Triple(MediaStore.Files.getContentUri("external"), "Downloads/SnapLink", mime)
+            isRaw -> Triple(MediaStore.Files.getContentUri("external"), "Download/SnapLink", mime)
             else -> Triple(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "Pictures/SnapLink", mime)
         }
     }
@@ -1041,6 +1256,7 @@ class MainActivity: FlutterActivity() {
     }
 
     override fun onDestroy() {
+        mediaExecutor.shutdown()
         super.onDestroy()
         if (cameraNetworkCallback != null) {
             try {

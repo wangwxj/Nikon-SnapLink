@@ -35,13 +35,13 @@ class VantCell extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           border: showDivider
-              ? Border(bottom: BorderSide(color: SnapColors.border, width: 0.6))
+              ? Border(bottom: BorderSide(color: SnapColors.of(context).border, width: 0.6))
               : null,
         ),
         child: Row(
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 18, color: SnapColors.primary),
+              Icon(icon, size: 18, color: SnapColors.of(context).primary),
               const SizedBox(width: 12),
             ] else if (leading != null) ...[
               leading!,
@@ -55,7 +55,7 @@ class VantCell extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      color: SnapColors.textPrimary,
+                      color: SnapColors.of(context).textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -65,7 +65,7 @@ class VantCell extends StatelessWidget {
                     Text(
                       label!,
                       style: TextStyle(
-                        color: SnapColors.textSecondary,
+                        color: SnapColors.of(context).textSecondary,
                         fontSize: 11,
                       ),
                     ),
@@ -79,13 +79,13 @@ class VantCell extends StatelessWidget {
               Text(
                 value!,
                 style: TextStyle(
-                  color: SnapColors.textSecondary,
+                  color: SnapColors.of(context).textSecondary,
                   fontSize: 13,
                 ),
               ),
             if (isLink) ...[
               const SizedBox(width: 6),
-              Icon(Icons.arrow_forward_ios, size: 12, color: SnapColors.textTertiary),
+              Icon(Icons.arrow_forward_ios, size: 12, color: SnapColors.of(context).textTertiary),
             ],
           ],
         ),
@@ -116,7 +116,7 @@ class VantCellGroup extends StatelessWidget {
             child: Text(
               title!,
               style: TextStyle(
-                color: SnapColors.textTertiary,
+                color: SnapColors.of(context).textTertiary,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.5,
@@ -127,9 +127,9 @@ class VantCellGroup extends StatelessWidget {
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: SnapColors.card,
+            color: SnapColors.of(context).card,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: SnapColors.border, width: 0.8),
+            border: Border.all(color: SnapColors.of(context).border, width: 0.8),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
@@ -170,24 +170,24 @@ class VantButton extends StatelessWidget {
     Color fg;
     switch (type) {
       case VantButtonType.primary:
-        bg = SnapColors.primary;
-        fg = SnapColors.textInverse;
+        bg = SnapColors.of(context).primary;
+        fg = SnapColors.of(context).textInverse;
         break;
       case VantButtonType.success:
-        bg = SnapColors.success;
+        bg = SnapColors.of(context).success;
         fg = Colors.white;
         break;
       case VantButtonType.danger:
-        bg = SnapColors.danger;
+        bg = SnapColors.of(context).danger;
         fg = Colors.white;
         break;
       case VantButtonType.warning:
-        bg = SnapColors.warning;
+        bg = SnapColors.of(context).warning;
         fg = Colors.white;
         break;
       case VantButtonType.normal:
-        bg = SnapColors.cardElevated;
-        fg = SnapColors.textPrimary;
+        bg = SnapColors.of(context).cardElevated;
+        fg = SnapColors.of(context).textPrimary;
         break;
     }
 
@@ -248,7 +248,7 @@ class VantTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeColor = color ?? SnapColors.primary;
+    final themeColor = color ?? SnapColors.of(context).primary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(

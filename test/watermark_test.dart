@@ -15,21 +15,34 @@ void main() {
     test('6 款全新高质感摄影画廊模板枚举完整性与查找', () {
       expect(WatermarkTemplate.values.length, equals(7));
       expect(WatermarkTemplate.fromId('none'), equals(WatermarkTemplate.none));
-      expect(WatermarkTemplate.fromId('in_photo'), equals(WatermarkTemplate.inPhotoOverlay));
-      expect(WatermarkTemplate.fromId('bottom_banner_blur'), equals(WatermarkTemplate.bottomBannerBlur));
-      expect(WatermarkTemplate.fromId('top_bottom_banner_blur'), equals(WatermarkTemplate.topBottomBannerBlur));
-      expect(WatermarkTemplate.fromId('dark_glass_blur'), equals(WatermarkTemplate.darkGlassBlur));
-      expect(WatermarkTemplate.fromId('polaroid_blur'), equals(WatermarkTemplate.polaroidBlur));
-      expect(WatermarkTemplate.fromId('flush_master_bar'), equals(WatermarkTemplate.flushMasterBar));
+      expect(WatermarkTemplate.fromId('in_photo'),
+          equals(WatermarkTemplate.inPhotoOverlay));
+      expect(WatermarkTemplate.fromId('bottom_banner_blur'),
+          equals(WatermarkTemplate.bottomBannerBlur));
+      expect(WatermarkTemplate.fromId('top_bottom_banner_blur'),
+          equals(WatermarkTemplate.topBottomBannerBlur));
+      expect(WatermarkTemplate.fromId('dark_glass_blur'),
+          equals(WatermarkTemplate.darkGlassBlur));
+      expect(WatermarkTemplate.fromId('polaroid_blur'),
+          equals(WatermarkTemplate.polaroidBlur));
+      expect(WatermarkTemplate.fromId('flush_master_bar'),
+          equals(WatermarkTemplate.flushMasterBar));
 
       // 验证向后平滑兼容历史 ID
-      expect(WatermarkTemplate.fromId('blur_card_gallery'), equals(WatermarkTemplate.bottomBannerBlur));
-      expect(WatermarkTemplate.fromId('cinema_black'), equals(WatermarkTemplate.darkGlassBlur));
-      expect(WatermarkTemplate.fromId('classic_white'), equals(WatermarkTemplate.polaroidBlur));
-      expect(WatermarkTemplate.fromId('white_card'), equals(WatermarkTemplate.polaroidBlur));
-      expect(WatermarkTemplate.fromId('pro_master_bar'), equals(WatermarkTemplate.flushMasterBar));
-      expect(WatermarkTemplate.fromId('exposure_grid'), equals(WatermarkTemplate.flushMasterBar));
-      expect(WatermarkTemplate.fromId('immersive_minimal'), equals(WatermarkTemplate.flushMasterBar));
+      expect(WatermarkTemplate.fromId('blur_card_gallery'),
+          equals(WatermarkTemplate.bottomBannerBlur));
+      expect(WatermarkTemplate.fromId('cinema_black'),
+          equals(WatermarkTemplate.darkGlassBlur));
+      expect(WatermarkTemplate.fromId('classic_white'),
+          equals(WatermarkTemplate.polaroidBlur));
+      expect(WatermarkTemplate.fromId('white_card'),
+          equals(WatermarkTemplate.polaroidBlur));
+      expect(WatermarkTemplate.fromId('pro_master_bar'),
+          equals(WatermarkTemplate.flushMasterBar));
+      expect(WatermarkTemplate.fromId('exposure_grid'),
+          equals(WatermarkTemplate.flushMasterBar));
+      expect(WatermarkTemplate.fromId('immersive_minimal'),
+          equals(WatermarkTemplate.flushMasterBar));
     });
 
     test('PhotoMetadata 格式化与标题规范化校验', () {
@@ -63,15 +76,17 @@ void main() {
 
       // 验证一级分类与二级分类体系
       expect(PhotoFilterType.categories1.length, equals(7));
-      expect(PhotoFilterType.categories1, containsAll([
-        '富士胶片',
-        '柯达胶片',
-        '理光人文',
-        '索尼大师',
-        '经典黑白',
-        '电影特色',
-        '经典精选',
-      ]));
+      expect(
+          PhotoFilterType.categories1,
+          containsAll([
+            '富士胶片',
+            '柯达胶片',
+            '理光人文',
+            '索尼大师',
+            '经典黑白',
+            '电影特色',
+            '经典精选',
+          ]));
 
       // 验证各一级分类下均包含正确的子项
       final fujiPresets = PhotoFilterType.getByCategories('富士胶片');
@@ -79,32 +94,37 @@ void main() {
       final kodakPresets = PhotoFilterType.getByCategories('柯达胶片');
       expect(kodakPresets.length, equals(14)); // 11 款彩色负片 + 3 款黑白
       final ricohPresets = PhotoFilterType.getByCategories('理光人文');
-      expect(ricohPresets.length, equals(8));  // 8 款 GR 影像控制
+      expect(ricohPresets.length, equals(8)); // 8 款 GR 影像控制
       final sonyPresets = PhotoFilterType.getByCategories('索尼大师');
-      expect(sonyPresets.length, equals(22)); // 8 款索尼 + 5 徕卡哈苏 + 5 佳能尼康 + 4 松下奥巴
+      expect(
+          sonyPresets.length, equals(22)); // 8 款索尼 + 5 徕卡哈苏 + 5 佳能尼康 + 4 松下奥巴
       final monoPresets = PhotoFilterType.getByCategories('经典黑白');
-      expect(monoPresets.length, equals(5));  // 5 款伊尔福银盐
+      expect(monoPresets.length, equals(5)); // 5 款伊尔福银盐
       final cinePresets = PhotoFilterType.getByCategories('电影特色');
-      expect(cinePresets.length, equals(7));  // 4 款电影 + 3 款宝丽来爱克发
+      expect(cinePresets.length, equals(7)); // 4 款电影 + 3 款宝丽来爱克发
       final classicPresets = PhotoFilterType.getByCategories('经典精选');
       expect(classicPresets.length, equals(10)); // 1 款原片直出 + 9 款经典
 
       // 原片直出矩阵为单位矩阵
-      final originalMatrix = PhotoFilterEngine.getMatrix(PhotoFilterType.original, 1.0);
+      final originalMatrix =
+          PhotoFilterEngine.getMatrix(PhotoFilterType.original, 1.0);
       expect(originalMatrix.length, equals(20));
       expect(originalMatrix[0], equals(1.0));
       expect(originalMatrix[6], equals(1.0));
       expect(originalMatrix[12], equals(1.0));
 
       // 经典负片矩阵
-      final ccMatrix = PhotoFilterEngine.getMatrix(PhotoFilterType.classicChrome, 1.0);
+      final ccMatrix =
+          PhotoFilterEngine.getMatrix(PhotoFilterType.classicChrome, 1.0);
       expect(ccMatrix.length, equals(20));
       expect(ccMatrix.every((v) => !v.isNaN && !v.isInfinite), isTrue);
 
       // 新海诚动漫与冷白皮人像
-      final shinkaiMatrix = PhotoFilterEngine.getMatrix(PhotoFilterType.shinkaiAnime, 1.0);
+      final shinkaiMatrix =
+          PhotoFilterEngine.getMatrix(PhotoFilterType.shinkaiAnime, 1.0);
       expect(shinkaiMatrix.length, equals(20));
-      final portraitMatrix = PhotoFilterEngine.getMatrix(PhotoFilterType.fairSkin, 1.0);
+      final portraitMatrix =
+          PhotoFilterEngine.getMatrix(PhotoFilterType.fairSkin, 1.0);
       expect(portraitMatrix.length, equals(20));
 
       // 验证全部 87 种预设均具备真实参数映射、色板与有效调色矩阵
@@ -122,7 +142,8 @@ void main() {
       }
 
       // 50% 强度混合插值
-      final halfMatrix = PhotoFilterEngine.getMatrix(PhotoFilterType.classicChrome, 0.5);
+      final halfMatrix =
+          PhotoFilterEngine.getMatrix(PhotoFilterType.classicChrome, 0.5);
       expect(halfMatrix.length, equals(20));
       expect(halfMatrix[0], closeTo((1.0 + ccMatrix[0]) / 2.0, 0.01));
     });
@@ -132,7 +153,8 @@ void main() {
       const adjDefault = PhotoEditAdjustments.initial;
       expect(adjDefault.isDefault, isTrue);
 
-      final identityMatrix = PhotoFilterEngine.buildAdjustmentsMatrix(adjDefault);
+      final identityMatrix =
+          PhotoFilterEngine.buildAdjustmentsMatrix(adjDefault);
       expect(identityMatrix, equals(PhotoFilterEngine.identityMatrix));
 
       // 曝光、对比度、纹理、高光色相调节矩阵运算
@@ -160,11 +182,11 @@ void main() {
       final warmAdj = const PhotoEditAdjustments().copyWith(temperature: 50.0);
       final warmMatrix = PhotoFilterEngine.buildAdjustmentsMatrix(warmAdj);
       expect(warmMatrix[0], greaterThan(1.0)); // 红色增益增强
-      expect(warmMatrix[12], lessThan(1.0));   // 蓝色增益压暗
+      expect(warmMatrix[12], lessThan(1.0)); // 蓝色增益压暗
 
       final coolAdj = const PhotoEditAdjustments().copyWith(temperature: -50.0);
       final coolMatrix = PhotoFilterEngine.buildAdjustmentsMatrix(coolAdj);
-      expect(coolMatrix[0], lessThan(1.0));   // 红色增益压暗
+      expect(coolMatrix[0], lessThan(1.0)); // 红色增益压暗
       expect(coolMatrix[12], greaterThan(1.0)); // 蓝色增益增强
     });
 
@@ -209,62 +231,87 @@ void main() {
       const srcH = 4000.0;
 
       // 纯调色无水印保持原图尺寸与零边距
-      final noneLayout = WatermarkCanvasPainter.computeLayout(srcW, srcH, WatermarkTemplate.none);
+      final noneLayout = WatermarkCanvasPainter.computeLayout(
+          srcW, srcH, WatermarkTemplate.none);
       expect(noneLayout.totalWidth, equals(srcW));
       expect(noneLayout.totalHeight, equals(srcH));
       expect(noneLayout.imageRect.left, equals(0));
 
       // 照片内嵌参数入画：满幅无边框，文字排在照片内部
-      final inPhotoLayout = WatermarkCanvasPainter.computeLayout(srcW, srcH, WatermarkTemplate.inPhotoOverlay);
+      final inPhotoLayout = WatermarkCanvasPainter.computeLayout(
+          srcW, srcH, WatermarkTemplate.inPhotoOverlay);
       expect(inPhotoLayout.totalWidth, equals(srcW));
       expect(inPhotoLayout.totalHeight, equals(srcH));
       expect(inPhotoLayout.imageRect.width, equals(srcW));
       expect(inPhotoLayout.imageRect.top, equals(0));
 
       // 高斯虚化纯下边框 (四周带虚化外框，图片左右与卡片齐平)
-      final bottomBannerLayout = WatermarkCanvasPainter.computeLayout(srcW, srcH, WatermarkTemplate.bottomBannerBlur);
+      final bottomBannerLayout = WatermarkCanvasPainter.computeLayout(
+          srcW, srcH, WatermarkTemplate.bottomBannerBlur);
       expect(bottomBannerLayout.totalWidth, greaterThan(srcW));
       expect(bottomBannerLayout.totalHeight, greaterThan(srcH));
       expect(bottomBannerLayout.imageRect.left, greaterThan(0));
       expect(bottomBannerLayout.imageRect.width, equals(srcW));
 
       // 高斯虚化上下双边框 (顶部 LIGHT AND SHADOW，底部大师参数)
-      final topBottomLayout = WatermarkCanvasPainter.computeLayout(srcW, srcH, WatermarkTemplate.topBottomBannerBlur);
+      final topBottomLayout = WatermarkCanvasPainter.computeLayout(
+          srcW, srcH, WatermarkTemplate.topBottomBannerBlur);
       expect(topBottomLayout.totalWidth, greaterThan(srcW));
       expect(topBottomLayout.totalHeight, greaterThan(srcH));
       expect(topBottomLayout.imageRect.top, greaterThan(0));
 
       // 极光暗黑黑玻
-      final darkGlassLayout = WatermarkCanvasPainter.computeLayout(srcW, srcH, WatermarkTemplate.darkGlassBlur);
+      final darkGlassLayout = WatermarkCanvasPainter.computeLayout(
+          srcW, srcH, WatermarkTemplate.darkGlassBlur);
       expect(darkGlassLayout.totalWidth, greaterThan(srcW));
       expect(darkGlassLayout.totalHeight, greaterThan(srcH));
 
       // 拍立得复古白卡
-      final polaroidLayout = WatermarkCanvasPainter.computeLayout(srcW, srcH, WatermarkTemplate.polaroidBlur);
+      final polaroidLayout = WatermarkCanvasPainter.computeLayout(
+          srcW, srcH, WatermarkTemplate.polaroidBlur);
       expect(polaroidLayout.totalWidth, greaterThan(srcW));
       expect(polaroidLayout.totalHeight, greaterThan(srcH));
 
       // 大师画廊纯净直出底栏 (保持原图宽度，仅底部追加信息条)
-      final masterLayout = WatermarkCanvasPainter.computeLayout(srcW, srcH, WatermarkTemplate.flushMasterBar);
+      final masterLayout = WatermarkCanvasPainter.computeLayout(
+          srcW, srcH, WatermarkTemplate.flushMasterBar);
       expect(masterLayout.totalWidth, equals(srcW));
       expect(masterLayout.totalHeight, greaterThan(srcH));
       expect(masterLayout.imageRect.left, equals(0));
       expect(masterLayout.imageRect.top, equals(0));
     });
 
+    test('低分辨率输入按 1200px 设计基准等比放大，纯调色保持原尺寸', () {
+      final large = WatermarkCanvasPainter.computeLayout(
+          6000, 4000, WatermarkTemplate.bottomBannerBlur);
+      final small = WatermarkCanvasPainter.computeLayout(
+          600, 400, WatermarkTemplate.bottomBannerBlur);
+      expect(small.imageRect.width, equals(1200),
+          reason: '低于基准的水印画布放大到 1200px，字号才不会小到糊成一团');
+      expect(small.totalWidth / small.totalHeight,
+          closeTo(large.totalWidth / large.totalHeight, 1e-9),
+          reason: '放大只改光栅分辨率，版式比例必须与原设计一致');
+      expect(
+          WatermarkCanvasPainter.computeLayout(600, 400, WatermarkTemplate.none)
+              .totalWidth,
+          equals(600),
+          reason: '纯调色承诺保持原图尺寸，不参与放大');
+    });
+
     test('竖拍照片旋转 90 度后成品宽高互换且不裁切', () {
       const w = 4000.0;
       const h = 6000.0;
       // 模拟旋转后按 srcW/srcH 互换参与排版
-      final landscapeLayout = WatermarkCanvasPainter.computeLayout(h, w, WatermarkTemplate.none);
+      final landscapeLayout =
+          WatermarkCanvasPainter.computeLayout(h, w, WatermarkTemplate.none);
       expect(landscapeLayout.totalWidth, equals(h));
       expect(landscapeLayout.totalHeight, equals(w));
       expect(landscapeLayout.imageRect.width, equals(h));
       expect(landscapeLayout.imageRect.height, equals(w));
 
-      final banner = WatermarkCanvasPainter.computeLayout(h, w, WatermarkTemplate.flushMasterBar);
-      expect(banner.imageRect.width, equals(h),
-          reason: '旋转后照片完整占满宽度，不裁切');
+      final banner = WatermarkCanvasPainter.computeLayout(
+          h, w, WatermarkTemplate.flushMasterBar);
+      expect(banner.imageRect.width, equals(h), reason: '旋转后照片完整占满宽度，不裁切');
       expect(banner.imageRect.left, equals(0));
     });
 
@@ -316,10 +363,14 @@ void main() {
 
       // 约束来源：浅色面板上的菜单/按钮不应再用「未选中 = 白字」的写法。
       // (浮在黑色照片画布上的叠加按钮仍可保留白色，故只锁定该模式)
-      final src = File('lib/ui/screens/watermark_screen.dart').readAsStringSync();
-      expect(src.contains('isSelected ? Colors.black : Colors.white70'), isFalse,
+      final src =
+          File('lib/ui/screens/watermark_screen.dart').readAsStringSync();
+      expect(
+          src.contains('isSelected ? Colors.black : Colors.white70'), isFalse,
           reason: '浅色面板的选中态菜单不应残留硬编码白字');
-      expect(src.contains('WidgetState.selected) ? Colors.black : Colors.white70'), isFalse,
+      expect(
+          src.contains('WidgetState.selected) ? Colors.black : Colors.white70'),
+          isFalse,
           reason: '浅色面板的分段按钮不应残留硬编码白字');
     });
 
@@ -329,7 +380,7 @@ void main() {
         theme: VantTheme.lightTheme,
         builder: (context, child) {
           SnapColors.use(VantTheme.brightnessFor(
-            ThemeMode.light, MediaQuery.platformBrightnessOf(context)));
+              ThemeMode.light, MediaQuery.platformBrightnessOf(context)));
           return child ?? const SizedBox.shrink();
         },
         home: const WatermarkScreen(),
@@ -337,16 +388,48 @@ void main() {
       await tester.pumpAndSettle();
 
       // 切到调色 Tab
-      await tester.tap(find.text('直出胶片调色'));
+      await tester.tap(find.text('调色预设'));
       await tester.pumpAndSettle();
 
       // 一级调色分组药丸（未选中）文字应为语义色，而非白色。
       final groupLabel = find.text('白平衡');
+      await tester.scrollUntilVisible(groupLabel, 100,
+          scrollable: find
+              .ancestor(
+                  of: find.byType(LightroomHistogramWidget),
+                  matching: find.byType(Scrollable))
+              .first);
       expect(groupLabel, findsWidgets);
       final textWidget = tester.widgetList<Text>(groupLabel).first;
       expect(textWidget.style?.color, isNot(equals(Colors.white)),
           reason: '浅色下未选中的一级调色菜单不能是白字');
       expect(textWidget.style?.color, SnapColors.textSecondary);
+    });
+  });
+
+  group('图像编辑空态与模板线框配色', () {
+    testWidgets('未选照片时图像编辑直接提示未选择照片', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: VantTheme.lightTheme,
+        home: const WatermarkScreen(),
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('图像编辑'));
+      await tester.pumpAndSettle();
+      expect(find.text('未选择照片'), findsOneWidget);
+      expect(find.text('正在准备编辑预览…'), findsNothing);
+    });
+
+    test('模板线框缩略图不跟随主题文字色（浅色下会黑白反转糊掉）', () {
+      final src =
+          File('lib/ui/screens/watermark_screen.dart').readAsStringSync();
+      final start = src.indexOf('Widget _getTemplateWireframe');
+      final end = src.indexOf('/// 构建单个水印模板卡片');
+      expect(start, greaterThan(0));
+      expect(end, greaterThan(start));
+      final body = src.substring(start, end);
+      expect(body.contains('textPrimary'), isFalse,
+          reason: '线框代表模板真实配色（白卡黑字），不可随主题文字色反转');
     });
   });
 }

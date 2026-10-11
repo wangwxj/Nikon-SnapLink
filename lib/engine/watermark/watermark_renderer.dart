@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/utils/exif_helper.dart';
 import '../filter/photo_filter.dart';
-import '../transfer/export_history_manager.dart';
 import 'watermark_painter.dart';
 import 'watermark_template.dart';
 
@@ -80,31 +79,22 @@ class WatermarkRenderer {
     final renderedImage = await picture.toImage(targetW, targetH);
     
     // 转为 PNG 格式无损字节
-    final byteData = await renderedImage.toByteData(format: ui.ImageByteFormat.png);
+    final ByteData? byteData;
+    try { byteData = await renderedImage.toByteData(format: ui.ImageByteFormat.png); }
+    finally { renderedImage.dispose(); picture.dispose(); }
     if (byteData == null) {
       throw Exception('水印图片光栅化编码失败');
     }
 
     final bytes = byteData.buffer.asUint8List();
 
-    // 3. 写入应用相册缓存目录或 Pictures 目录
-    Directory saveDir;
-    try {
-      final picturesDir = Directory('/storage/emulated/0/Pictures/SnapLink');
-      if (await picturesDir.exists() || (await picturesDir.create(recursive: true)).existsSync()) {
-        saveDir = picturesDir;
-      } else {
-        saveDir = await getApplicationDocumentsDirectory();
-      }
-    } catch (_) {
-      saveDir = await getApplicationDocumentsDirectory();
-    }
+    // MediaStore 写入前只使用临时文件。
+    final saveDir = await getTemporaryDirectory();
 
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final fileName = 'SnapLink_${metadata.cameraModel.replaceAll(' ', '_')}_$timestamp.png';
     final outFile = File('${saveDir.path}/$fileName');
     await outFile.writeAsBytes(bytes, flush: true);
-    ExportHistoryManager().registerExported(fileName, outFile);
 
     return ExportResult(
       file: outFile,
@@ -117,7 +107,6 @@ class WatermarkRenderer {
   /// 辅助方法：从原始字节快速解码 ui.Image
   static Future<ui.Image> decodeImageFromBytes(Uint8List bytes) async {
     final codec = await ui.instantiateImageCodec(bytes);
-    final frameInfo = await codec.getNextFrame();
-    return frameInfo.image;
+    try { return (await codec.getNextFrame()).image; } finally { codec.dispose(); }
   }
 }

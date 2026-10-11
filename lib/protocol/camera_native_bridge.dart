@@ -267,6 +267,60 @@ class CameraNativeBridge {
     }
   }
 
+  static Future<List<Map<String, dynamic>>> listSavedMedia() async {
+    final rows = await _channel.invokeListMethod<dynamic>('listSavedMedia');
+    return (rows ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  static Future<String?> materializeMedia(String uri) =>
+      _channel.invokeMethod<String>('materializeMedia', {'uri': uri});
+
+  /// 批量按文件名在公共媒体库中查找 URI（用于旧导出历史删除）。
+  /// 返回 fileName -> URI 映射；查不到的文件不在映射中，调用方回退到文件路径。
+  static Future<Map<String, String>> findMediaUris(List<String> fileNames) async {
+    if (fileNames.isEmpty) return const {};
+    try {
+      final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('findMediaUris', {
+        'fileNames': fileNames,
+      });
+      if (res == null) return const {};
+      return {
+        for (final e in res.entries)
+          e.key.toString(): e.value.toString(),
+      };
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// 删除系统公共媒体库中的文件（MediaStore URI 或旧系统绝对路径）。
+  /// 返回 false 表示未删除成功，调用方必须计入失败汇总。
+  static Future<bool> deleteMedia(String target) async {
+    try {
+      if (target.isEmpty) return false;
+      final res = await _channel.invokeMethod<bool>('deleteMedia', {'target': target});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 用 [srcPath] 的字节覆盖已有 MediaStore 条目（覆盖原图）。
+  /// 仅对本应用写入、带 mediaUri 的条目可靠；失败返回 false，调用方应回退到另存。
+  static Future<bool> overwriteMedia(String mediaUri, String srcPath) async {
+    try {
+      if (mediaUri.isEmpty || srcPath.isEmpty) return false;
+      final res = await _channel.invokeMethod<bool>('overwriteMedia', {
+        'mediaUri': mediaUri,
+        'srcPath': srcPath,
+      });
+      return res ?? false;
+    } on PlatformException catch (e) {
+      if (e.code == 'OVERWRITE_RESTORE_FAILED') rethrow;
+      return false;
+    }
+  }
+
   /// 调起 Android 原生包安装器安装指定的本地 APK 文件
   static Future<bool> installApk(String filePath) async {
     try {

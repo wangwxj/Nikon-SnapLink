@@ -94,6 +94,7 @@ class _RootScaffoldState extends State<RootScaffold> {
         downloadManager: _downloadManager,
         shootAndTransferController: _shootAndTransferController,
         onOpenWatermark: (file, cachedBytes, {bool openFilter = false}) async {
+          if(cachedBytes==null || cachedBytes.isEmpty) return;
           setState(() => _currentIndex = 3);
           if (openFilter) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -115,16 +116,7 @@ class _RootScaffoldState extends State<RootScaffold> {
             }
           }
 
-          if (cachedBytes != null && cachedBytes.isNotEmpty) {
-            inject(cachedBytes);
-          } else {
-            try {
-              final bytes = await _driver.getThumbnail(file.handle);
-              if (bytes.isNotEmpty) {
-                inject(bytes);
-              }
-            } catch (_) {}
-          }
+          inject(cachedBytes);
         },
       ),
       WatermarkScreen(key: _watermarkKey),
@@ -155,27 +147,27 @@ class _RootScaffoldState extends State<RootScaffold> {
         items: [
           BottomNavigationBarItem(
             icon: Icon(Icons.wifi_tethering),
-            activeIcon: Icon(Icons.wifi_tethering, color: SnapColors.primary),
+            activeIcon: Icon(Icons.wifi_tethering, color: SnapColors.of(context).primary),
             label: '连接',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.videocam_outlined),
-            activeIcon: Icon(Icons.videocam, color: SnapColors.primary),
+            activeIcon: Icon(Icons.videocam, color: SnapColors.of(context).primary),
             label: '监看取景',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.photo_library_outlined),
-            activeIcon: Icon(Icons.photo_library, color: SnapColors.primary),
+            activeIcon: Icon(Icons.photo_library, color: SnapColors.of(context).primary),
             label: '相机相册',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.branding_watermark_outlined),
-            activeIcon: Icon(Icons.branding_watermark, color: SnapColors.primary),
+            activeIcon: Icon(Icons.branding_watermark, color: SnapColors.of(context).primary),
             label: '水印工坊',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.tune_outlined),
-            activeIcon: Icon(Icons.tune, color: SnapColors.primary),
+            activeIcon: Icon(Icons.tune, color: SnapColors.of(context).primary),
             label: '设置',
           ),
         ],

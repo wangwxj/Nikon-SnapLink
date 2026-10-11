@@ -19,6 +19,7 @@ class AppSettings extends ChangeNotifier {
   static const bool defaultPowerProtectionEnabled = true;
   static const int defaultPowerThreshold = 15;
   static const AppThemeMode defaultThemeMode = AppThemeMode.system;
+  static const bool defaultConfirmDelete = true;
 
   static const List<int> fpsOptions = [4, 8, 15];
   static const List<int> powerThresholdOptions = [10, 15, 20, 30];
@@ -32,6 +33,7 @@ class AppSettings extends ChangeNotifier {
   bool powerProtectionEnabled = defaultPowerProtectionEnabled;
   int powerThreshold = defaultPowerThreshold;
   AppThemeMode themeMode = defaultThemeMode;
+  bool confirmDelete = defaultConfirmDelete;
 
   File? _file;
   bool _suppressSave = false;
@@ -62,6 +64,7 @@ class AppSettings extends ChangeNotifier {
       powerThreshold =
           _normalizeThreshold(_readInt(m, 'powerThreshold', defaultPowerThreshold));
       themeMode = parseThemeMode(m['themeMode']);
+      confirmDelete = _readBool(m, 'confirmDelete', defaultConfirmDelete);
     } catch (_) {
       // 配置文件损坏：保持默认值
     } finally {
@@ -82,6 +85,7 @@ class AppSettings extends ChangeNotifier {
         'powerProtectionEnabled': powerProtectionEnabled,
         'powerThreshold': powerThreshold,
         'themeMode': themeMode.name,
+        'confirmDelete': confirmDelete,
       }));
     } catch (_) {
       // 落盘失败不中断用户操作
@@ -158,6 +162,13 @@ class AppSettings extends ChangeNotifier {
     _scheduleSave();
   }
 
+  void setConfirmDelete(bool value) {
+    if (value == confirmDelete) return;
+    confirmDelete = value;
+    notifyListeners();
+    _scheduleSave();
+  }
+
   void setThemeMode(AppThemeMode value) {
     if (value == themeMode) return;
     themeMode = value;
@@ -176,6 +187,7 @@ class AppSettings extends ChangeNotifier {
     powerProtectionEnabled = defaultPowerProtectionEnabled;
     powerThreshold = defaultPowerThreshold;
     themeMode = defaultThemeMode;
+    confirmDelete = defaultConfirmDelete;
     _file = null;
   }
 

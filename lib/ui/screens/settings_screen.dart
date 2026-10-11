@@ -21,14 +21,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('配置相机 IP 地址', style: TextStyle(fontSize: 16)),
+        title: const Text('配置相机 IP 地址', style: const TextStyle(fontSize: 16)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               '尼康相机热点默认网关为 192.168.0.1，部分发射器为 192.168.1.1',
-              style: TextStyle(color: SnapColors.textTertiary, fontSize: 12),
+              style: TextStyle(color: SnapColors.of(ctx).textTertiary, fontSize: 12),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -36,7 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: const TextStyle(fontFamily: 'monospace'),
               decoration: const InputDecoration(
                 labelText: 'IP 地址',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
             ),
           ],
@@ -66,14 +66,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('配置 PTP/IP 端口', style: TextStyle(fontSize: 16)),
+        title: const Text('配置 PTP/IP 端口', style: const TextStyle(fontSize: 16)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               '尼康 PTP/IP 硬件标准通信端口为 15740',
-              style: TextStyle(color: SnapColors.textTertiary, fontSize: 12),
+              style: TextStyle(color: SnapColors.of(ctx).textTertiary, fontSize: 12),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -82,7 +82,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: const TextStyle(fontFamily: 'monospace'),
               decoration: const InputDecoration(
                 labelText: '端口号',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
             ),
           ],
@@ -132,7 +132,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     value: _themeLabel(settings.themeMode),
                     icon: Icons.palette_outlined,
                     isLink: true,
-                    onTap: () => _openDetail(const _AppearanceDetail()),
+                    onTap: () => _openDetail(_AppearanceDetail()),
                   ),
                   VantCell(
                     title: '相机连接',
@@ -153,7 +153,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     value: '${settings.autoKeepAlive ? '保活开' : '保活关'} · RAW ${settings.downloadRaw ? '开' : '关'}',
                     icon: Icons.sync_alt,
                     isLink: true,
-                    onTap: () => _openDetail(const _WirelessDetail()),
+                    onTap: () => _openDetail(_WirelessDetail()),
                   ),
                   VantCell(
                     title: '取景与拍摄',
@@ -161,7 +161,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     value: '${settings.preferredFps} FPS · 横屏',
                     icon: Icons.videocam_outlined,
                     isLink: true,
-                    onTap: () => _openDetail(const _LiveViewDetail()),
+                    onTap: () => _openDetail(_LiveViewDetail()),
                   ),
                   VantCell(
                     title: '电池与传输保护',
@@ -171,7 +171,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         : '已关闭',
                     icon: Icons.battery_saver_outlined,
                     isLink: true,
-                    onTap: () => _openDetail(const _PowerProtectionDetail()),
+                    onTap: () => _openDetail(_PowerProtectionDetail()),
                   ),
                 ],
               ),
@@ -184,7 +184,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     value: '${AppLogManager.instance.logs.length} 条记录',
                     icon: Icons.receipt_long_outlined,
                     isLink: true,
-                    onTap: () => _openDetail(const _DiagnosticsDetail()),
+                    onTap: () => _openDetail(_DiagnosticsDetail()),
                   ),
                   VantCell(
                     title: '关于 SnapLink',
@@ -192,7 +192,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     value: 'v${AppUpdateManager.currentVersion}',
                     icon: Icons.info_outline,
                     isLink: true,
-                    onTap: () => _openDetail(const _AboutDetail()),
+                    onTap: () => _openDetail(_AboutDetail()),
                   ),
                 ],
               ),
@@ -229,7 +229,7 @@ class _SettingsDetailScaffold extends StatelessWidget {
   final String title;
   final List<Widget> children;
 
-  const _SettingsDetailScaffold({
+  _SettingsDetailScaffold({
     required this.title,
     required this.children,
   });
@@ -249,7 +249,7 @@ class _SettingsDetailScaffold extends StatelessWidget {
 }
 
 class _AppearanceDetail extends StatelessWidget {
-  const _AppearanceDetail();
+  _AppearanceDetail();
 
   @override
   Widget build(BuildContext context) {
@@ -270,7 +270,7 @@ class _AppearanceDetail extends StatelessWidget {
                   icon: _themeIcon(mode),
                   customValue: Icon(
                     selected ? Icons.check_circle : Icons.circle_outlined,
-                    color: selected ? SnapColors.primary : SnapColors.textTertiary,
+                    color: selected ? SnapColors.of(context).primary : SnapColors.of(context).textTertiary,
                     size: 20,
                   ),
                   onTap: () => AppSettings.instance.setThemeMode(mode),
@@ -283,7 +283,7 @@ class _AppearanceDetail extends StatelessWidget {
               child: Text(
                 '颜色预览',
                 style: TextStyle(
-                  color: SnapColors.textTertiary,
+                  color: SnapColors.of(context).textTertiary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
@@ -291,8 +291,8 @@ class _AppearanceDetail extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
                   Expanded(
@@ -301,7 +301,7 @@ class _AppearanceDetail extends StatelessWidget {
                       palette: SnapPalette.light,
                     ),
                   ),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: _PalettePreview(
                       title: '深色',
@@ -322,7 +322,7 @@ class _PalettePreview extends StatelessWidget {
   final String title;
   final SnapPalette palette;
 
-  const _PalettePreview({
+  _PalettePreview({
     required this.title,
     required this.palette,
   });
@@ -361,7 +361,7 @@ class _PalettePreview extends StatelessWidget {
 class _Swatch extends StatelessWidget {
   final Color color;
 
-  const _Swatch({required this.color});
+  _Swatch({required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -371,7 +371,7 @@ class _Swatch extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: SnapColors.border),
+          border: Border.all(color: SnapColors.of(context).border),
         ),
       ),
     );
@@ -382,7 +382,7 @@ class _CameraConnectionDetail extends StatelessWidget {
   final VoidCallback onEditIp;
   final VoidCallback onEditPort;
 
-  const _CameraConnectionDetail({
+  _CameraConnectionDetail({
     required this.onEditIp,
     required this.onEditPort,
   });
@@ -419,7 +419,7 @@ class _CameraConnectionDetail extends StatelessWidget {
                     settings.setCameraIp('192.168.0.1');
                     settings.setCameraPort(15740);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('已恢复尼康默认相机热点地址')),
+                      const SnackBar(content: const Text('已恢复尼康默认相机热点地址')),
                     );
                   },
                 ),
@@ -431,7 +431,7 @@ class _CameraConnectionDetail extends StatelessWidget {
                     settings.setCameraIp('192.168.1.1');
                     settings.setCameraPort(15740);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('已设置为局域网发射器地址')),
+                      const SnackBar(content: const Text('已设置为局域网发射器地址')),
                     );
                   },
                 ),
@@ -458,7 +458,7 @@ class _CameraConnectionDetail extends StatelessWidget {
 }
 
 class _WirelessDetail extends StatelessWidget {
-  const _WirelessDetail();
+  _WirelessDetail();
 
   @override
   Widget build(BuildContext context) {
@@ -498,6 +498,19 @@ class _WirelessDetail extends StatelessWidget {
                 ),
               ],
             ),
+            VantCellGroup(
+              title: '删除与确认',
+              children: [
+                VantCell(
+                  title: '删除前再次确认',
+                  label: '关闭后，选定删除范围即执行不可恢复的删除',
+                  customValue: Switch(
+                    value: settings.confirmDelete,
+                    onChanged: settings.setConfirmDelete,
+                  ),
+                ),
+              ],
+            ),
           ],
         );
       },
@@ -506,7 +519,7 @@ class _WirelessDetail extends StatelessWidget {
 }
 
 class _LiveViewDetail extends StatelessWidget {
-  const _LiveViewDetail();
+  _LiveViewDetail();
 
   @override
   Widget build(BuildContext context) {
@@ -525,7 +538,7 @@ class _LiveViewDetail extends StatelessWidget {
                   value: '${settings.preferredFps} FPS',
                   isLink: true,
                   onTap: () {
-                    final options = AppSettings.fpsOptions;
+                    const options = AppSettings.fpsOptions;
                     final index = options.indexOf(settings.preferredFps);
                     settings.setPreferredFps(options[(index + 1) % options.length]);
                   },
@@ -543,10 +556,10 @@ class _LiveViewDetail extends StatelessWidget {
             const VantCellGroup(
               title: 'LiveView 变焦手势',
               children: [
-                VantCell(title: '双击左半屏', value: '广角 (WIDE)'),
-                VantCell(title: '双击右半屏', value: '长焦 (TELE)'),
-                VantCell(title: '双指缩放', value: '张开长焦 / 捏合广角'),
-                VantCell(title: '单指单击画面', value: '自动对焦 (AF Drive)'),
+                const VantCell(title: '双击左半屏', value: '广角 (WIDE)'),
+                const VantCell(title: '双击右半屏', value: '长焦 (TELE)'),
+                const VantCell(title: '双指缩放', value: '张开长焦 / 捏合广角'),
+                const VantCell(title: '单指单击画面', value: '自动对焦 (AF Drive)'),
               ],
             ),
           ],
@@ -557,7 +570,7 @@ class _LiveViewDetail extends StatelessWidget {
 }
 
 class _PowerProtectionDetail extends StatelessWidget {
-  const _PowerProtectionDetail();
+  _PowerProtectionDetail();
 
   @override
   Widget build(BuildContext context) {
@@ -583,7 +596,7 @@ class _PowerProtectionDetail extends StatelessWidget {
                   value: '${settings.powerThreshold}%',
                   isLink: true,
                   onTap: () {
-                    final options = AppSettings.powerThresholdOptions;
+                    const options = AppSettings.powerThresholdOptions;
                     final index = options.indexOf(settings.powerThreshold);
                     settings.setPowerThreshold(options[(index + 1) % options.length]);
                   },
@@ -606,7 +619,7 @@ class _PowerProtectionDetail extends StatelessWidget {
 }
 
 class _DiagnosticsDetail extends StatelessWidget {
-  const _DiagnosticsDetail();
+  _DiagnosticsDetail();
 
   @override
   Widget build(BuildContext context) {
@@ -632,7 +645,7 @@ class _DiagnosticsDetail extends StatelessWidget {
                   onTap: () {
                     AppLogManager.instance.clear();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('已清空全部日志')),
+                      const SnackBar(content: const Text('已清空全部日志')),
                     );
                   },
                 ),
@@ -646,7 +659,7 @@ class _DiagnosticsDetail extends StatelessWidget {
 }
 
 class _AboutDetail extends StatelessWidget {
-  const _AboutDetail();
+  _AboutDetail();
 
   @override
   Widget build(BuildContext context) {
@@ -671,8 +684,8 @@ class _AboutDetail extends StatelessWidget {
         const VantCellGroup(
           title: '技术信息',
           children: [
-            VantCell(title: '驱动架构', value: 'Wi-Fi PTP/IP + USB PTP (Dart/Kotlin)'),
-            VantCell(title: 'UI 体系', value: 'Flutter Vant UI 摄影监看系统'),
+            const VantCell(title: '驱动架构', value: 'Wi-Fi PTP/IP + USB PTP (Dart/Kotlin)'),
+            const VantCell(title: 'UI 体系', value: 'Flutter Vant UI 摄影监看系统'),
           ],
         ),
         VantCellGroup(
@@ -700,11 +713,12 @@ void _showLogsViewerSheet(BuildContext context) {
     builder: (ctx) {
       return StatefulBuilder(
         builder: (sheetCtx, setSheetState) {
+          final context=sheetCtx;
           final logs = AppLogManager.instance.logs;
           return Container(
             height: MediaQuery.of(context).size.height * 0.75,
             padding: const EdgeInsets.all(16),
-            color: SnapColors.surface,
+            color: SnapColors.of(context).surface,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -713,7 +727,7 @@ void _showLogsViewerSheet(BuildContext context) {
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: SnapColors.borderLight,
+                      color: SnapColors.of(context).borderLight,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -725,7 +739,7 @@ void _showLogsViewerSheet(BuildContext context) {
                     Text(
                       '底层协议通信与握手日志',
                       style: TextStyle(
-                        color: SnapColors.textPrimary,
+                        color: SnapColors.of(context).textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
@@ -733,17 +747,17 @@ void _showLogsViewerSheet(BuildContext context) {
                     Row(
                       children: [
                         IconButton(
-                          icon: Icon(Icons.copy, size: 18, color: SnapColors.primary),
+                          icon: Icon(Icons.copy, size: 18, color: SnapColors.of(context).primary),
                           tooltip: '复制全部日志',
                           onPressed: () {
                             Clipboard.setData(ClipboardData(text: logs.join('\n')));
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('已复制全部通信日志至剪贴板')),
+                              const SnackBar(content: const Text('已复制全部通信日志至剪贴板')),
                             );
                           },
                         ),
                         IconButton(
-                          icon: Icon(Icons.delete_outline, size: 18, color: SnapColors.danger),
+                          icon: Icon(Icons.delete_outline, size: 18, color: SnapColors.of(context).danger),
                           tooltip: '清空日志',
                           onPressed: () {
                             AppLogManager.instance.clear();
@@ -759,15 +773,15 @@ void _showLogsViewerSheet(BuildContext context) {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: SnapColors.background,
+                      color: SnapColors.of(context).background,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: SnapColors.border),
+                      border: Border.all(color: SnapColors.of(context).border),
                     ),
                     child: logs.isEmpty
                         ? Center(
                             child: Text(
                               '暂无通信日志',
-                              style: TextStyle(color: SnapColors.textTertiary, fontSize: 12),
+                              style: TextStyle(color: SnapColors.of(context).textTertiary, fontSize: 12),
                             ),
                           )
                         : ListView.builder(
@@ -778,10 +792,10 @@ void _showLogsViewerSheet(BuildContext context) {
                                 logs[i],
                                 style: TextStyle(
                                   color: logs[i].contains('失败') || logs[i].contains('异常')
-                                      ? SnapColors.danger
+                                      ? SnapColors.of(context).danger
                                       : (logs[i].contains('成功')
-                                          ? SnapColors.success
-                                          : SnapColors.textSecondary),
+                                          ? SnapColors.of(context).success
+                                          : SnapColors.of(context).textSecondary),
                                   fontSize: 11,
                                   fontFamily: 'monospace',
                                   height: 1.3,

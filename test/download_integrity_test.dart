@@ -65,6 +65,8 @@ class FakeDriver implements CameraDriver {
   Future<CameraFileItem?> getObjectInfo(int handle) async => null;
   @override
   Future<Uint8List> getThumbnail(int handle) async => Uint8List(0);
+  @override
+  Future<bool> deleteObject(int handle) async => true;
 
   @override
   Future<Uint8List> downloadPartialObject(int handle, int offset, int maxBytes) async {

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/settings/app_settings.dart';
+import '../../core/utils/app_log_manager.dart';
 import '../../protocol/camera_driver.dart';
 import '../../protocol/camera_native_bridge.dart';
 import 'export_history_manager.dart';
@@ -346,7 +347,15 @@ class DownloadManager extends ChangeNotifier {
             throw StateError('保存到系统相册失败（MediaStore 拒绝写入 ${pendingTask.fileItem.fileName}）');
           }
 
-          ExportHistoryManager().registerExported(pendingTask.fileItem.fileName, partial);
+          final source = pendingTask.fileItem;
+          try {
+            await ExportHistoryManager().recordSource(
+              ExportHistoryManager.sourceKey(source.storageId, source.fileName, source.size, source.captureDate), saved);
+          } catch(e) {
+            // 公共相册已保存成功，索引失败不应重复下载或生成重复副本。
+            AppLogManager.instance.add('已保存照片，但来源索引写入失败: $e');
+          }
+          ExportHistoryManager().registerExported(source.fileName, partial, saved);
 
           pendingTask.localPath = saved;
           pendingTask.status = DownloadTaskStatus.completed;

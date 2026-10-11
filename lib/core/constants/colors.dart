@@ -9,6 +9,9 @@ class SnapColors {
 
   static SnapPalette _current = SnapPalette.dark;
 
+  static SnapPalette of(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? SnapPalette.dark : SnapPalette.light;
+
   static void use(Brightness brightness) {
     _current = brightness == Brightness.dark ? SnapPalette.dark : SnapPalette.light;
   }
@@ -115,7 +118,7 @@ class SnapPalette {
     primaryDark: Color(0xFF7A5200),
     textPrimary: Color(0xFF29251C),
     textSecondary: Color(0xFF6F6757),
-    textTertiary: Color(0xFF9A8F77),
+    textTertiary: Color(0xFF7A705F),
     textInverse: Color(0xFFFFFFFF),
     success: Color(0xFF087F3E),
     warning: Color(0xFFB45309),
